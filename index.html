@@ -1253,6 +1253,12 @@
         const selfIntro = ref('');
         const friendCount = ref(5);
         const chatCount = ref(0);
+        
+        const totalAnswered = ref(0);
+        const consecutiveLogins = ref(0);
+        const totalLogins = ref(0);
+        const examParticipatedCount = ref(0);
+        const likesSentCount = ref(0);
 
         const friendsList = ref([]);
         const directChats = ref({});
@@ -1369,6 +1375,19 @@
           return friendsList.value.filter(f => f.name.toLowerCase().includes(q));
         });
 
+        const checkAndUnlockBadge = (badgeId) => {
+          if (!unlockedBadges.value.includes(badgeId)) {
+            unlockedBadges.value.push(badgeId);
+            const badgeInfo = ALL_BADGES.find(b => b.id === badgeId);
+            if (badgeInfo) {
+              badgeToastMessage.value = `🏅バッジ【${badgeInfo.name}】を獲得しました！`;
+              showBadgeToast.value = true;
+              setTimeout(() => { showBadgeToast.value = false; }, 4000);
+            }
+            saveUserProfile();
+          }
+        };
+
         const activeMode = ref(null);
 
         const loadGlobalData = () => {
@@ -1416,7 +1435,8 @@
               isFarmMember: true, isFirmOwner: false, myFarmId: 'f_123', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0,
               unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5,
               friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {},
-              masteredBlocks: {}, masteredSubjects: {}, specialTitle: ''
+              masteredBlocks: {}, masteredSubjects: {}, specialTitle: '',
+              totalAnswered: 0, consecutiveLogins: 0, totalLogins: 0, examParticipatedCount: 0, likesSentCount: 0, lastLoginDate: ''
             };
           }
           
@@ -1435,6 +1455,33 @@
             dailyCorrect.value = 0;
             dailyCombo.value = 0;
             maxCombo.value = 0;
+          }
+          
+          totalAnswered.value = m.totalAnswered || 0;
+          examParticipatedCount.value = m.examParticipatedCount || 0;
+          likesSentCount.value = m.likesSentCount || 0;
+          
+          // ログイン日数の計算とバッジ判定
+          consecutiveLogins.value = m.consecutiveLogins || 0;
+          totalLogins.value = m.totalLogins || 0;
+          if (m.lastLoginDate !== todayStr) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (m.lastLoginDate === yesterday.toDateString()) {
+              consecutiveLogins.value++;
+            } else {
+              consecutiveLogins.value = 1;
+            }
+            totalLogins.value++;
+            m.lastLoginDate = todayStr;
+            
+            // ログイン関連バッジ判定
+            setTimeout(() => {
+              checkAndUnlockBadge('badge_profile_01');
+              if (consecutiveLogins.value >= 3) checkAndUnlockBadge('badge_profile_02');
+              if (consecutiveLogins.value >= 21) checkAndUnlockBadge('badge_profile_03');
+              if (totalLogins.value >= 100) checkAndUnlockBadge('badge_profile_04');
+            }, 1000);
           }
           
           unlockedBadges.value = m.unlockedBadges || ['🔰 新人'];
@@ -1505,7 +1552,7 @@
 
 
         // Auto Save Watcher
-        watch([isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, dailyCorrect, dailyCombo, maxCombo, unlockedBadges, activeBadge, selfIntro, friendCount, chatCount, friendsList, directChats, requestedFriends, correctCounts], () => {
+        watch([isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, dailyCorrect, dailyCombo, maxCombo, unlockedBadges, activeBadge, selfIntro, friendCount, chatCount, friendsList, directChats, requestedFriends, correctCounts, totalAnswered, consecutiveLogins, totalLogins, examParticipatedCount, likesSentCount], () => {
           if (!currentUser.value || !app_users[currentUser.value]) return;
           const u = app_users[currentUser.value];
           u.isPremium = isPremium.value;
@@ -1528,6 +1575,11 @@
             m.activeBadge = activeBadge.value;
             m.selfIntro = selfIntro.value;
             m.friendCount = friendCount.value;
+            m.totalAnswered = totalAnswered.value;
+            m.consecutiveLogins = consecutiveLogins.value;
+            m.totalLogins = totalLogins.value;
+            m.examParticipatedCount = examParticipatedCount.value;
+            m.likesSentCount = likesSentCount.value;
             m.friendsList = JSON.parse(JSON.stringify(friendsList.value));
             m.directChats = JSON.parse(JSON.stringify(directChats.value));
             m.requestedFriends = JSON.parse(JSON.stringify(requestedFriends.value));
@@ -1656,24 +1708,26 @@
             levelUpMessage.value = `Lv.${oldLevel} ➔ Lv.${newLevel}`;
             showLevelUp.value = true;
             setTimeout(() => { showLevelUp.value = false; }, 3000);
+            
+            // レベルバッジ判定
+            if (newLevel >= 10) checkAndUnlockBadge('badge_profile_05');
+            if (newLevel >= 20) checkAndUnlockBadge('badge_profile_06');
+            if (newLevel >= 30) checkAndUnlockBadge('badge_profile_07');
+            if (newLevel >= 40) checkAndUnlockBadge('badge_profile_08');
+            if (newLevel >= 50) checkAndUnlockBadge('badge_profile_09');
+            if (newLevel >= 60) checkAndUnlockBadge('badge_profile_10');
+            if (newLevel >= 70) checkAndUnlockBadge('badge_profile_11');
+            if (newLevel >= 80) checkAndUnlockBadge('badge_profile_12');
+            if (newLevel >= 90) checkAndUnlockBadge('badge_profile_13');
+            if (newLevel >= 100) checkAndUnlockBadge('badge_profile_14');
           }
           saveUserProfile();
         };
 
         const checkBadges = (isFromExam = false, examScore = 0) => {
-          const unlocks = [];
-          if (dailyCorrect.value >= 50 && !unlockedBadges.value.includes('日課の始まり')) unlocks.push('日課の始まり');
-          if (dailyCorrect.value >= 500 && !unlockedBadges.value.includes('スワイプの鬼')) unlocks.push('スワイプの鬼');
-          if (dailyCombo.value >= 30 && !unlockedBadges.value.includes('ゾーン突入')) unlocks.push('ゾーン突入');
-          if (dailyCombo.value >= 100 && !unlockedBadges.value.includes('神の打率')) unlocks.push('神の打率');
-          if (isFromExam && examScore >= 90 && !unlockedBadges.value.includes('10分間の支配者')) unlocks.push('10分間の支配者');
-
-          if (unlocks.length > 0) {
-            unlockedBadges.value.push(...unlocks);
-            badgeToastMessage.value = unlocks.join(', ');
-            showBadgeToast.value = true;
-            setTimeout(() => { showBadgeToast.value = false; }, 4000);
-            saveUserProfile();
+          // 旧checkBadgesロジックは新しい関数に集約したが、既存の呼び出し元があるためラップしておく
+          if (isFromExam && examScore >= 90) {
+            checkAndUnlockBadge('badge_quiz_06'); // 試験の場合は別途模試ロジックへ移行するがフォールバック
           }
         };
 
@@ -1962,7 +2016,8 @@
           } else {
             dailyCombo.value = 0;
           }
-          checkBadges();
+          if (dailyCombo.value >= 30) checkAndUnlockBadge('badge_quiz_04');
+          if (dailyCombo.value >= 50) checkAndUnlockBadge('badge_quiz_05');
           
           examCurrentIndex.value++;
           if (examCurrentIndex.value >= examQueue.value.length) {
@@ -1973,7 +2028,13 @@
         const endExam = () => {
           isExamFinished.value = true;
           addExp(examCorrectCount.value * 10);
-          if (examCorrectCount.value >= 90) checkBadges(true, examCorrectCount.value);
+          
+          examParticipatedCount.value++;
+          checkAndUnlockBadge('badge_exam_01');
+          if (examParticipatedCount.value >= 30) checkAndUnlockBadge('badge_exam_02');
+          if (examCorrectCount.value === 100) checkAndUnlockBadge('badge_exam_03');
+          if (examCorrectCount.value >= 90) checkAndUnlockBadge('10分間の支配者'); // 既存バッジ互換
+          
           if (examTimerInterval) clearInterval(examTimerInterval);
         };
 
@@ -2074,12 +2135,23 @@
 
         const handleAnswer = (userAnswer) => {
           isCorrect.value = (userAnswer === currentQuestion.value.is_correct);
+          
+          // 累計解答数のカウントアップとバッジ判定（正解・不正解問わず）
+          totalAnswered.value++;
+          if (totalAnswered.value >= 10) checkAndUnlockBadge('badge_quiz_01');
+          if (totalAnswered.value >= 1000) checkAndUnlockBadge('badge_quiz_02');
+          if (totalAnswered.value >= 5000) checkAndUnlockBadge('badge_quiz_03');
+
           if(isCorrect.value) {
             correctCount.value++;
             dailyCorrect.value++;
             dailyCombo.value++;
             if(dailyCombo.value > maxCombo.value) maxCombo.value = dailyCombo.value;
             addExp(10);
+            
+            // コンボバッジ判定
+            if (dailyCombo.value >= 30) checkAndUnlockBadge('badge_quiz_04');
+            if (dailyCombo.value >= 50) checkAndUnlockBadge('badge_quiz_05');
             
             // マスター正解数のカウント
             const qid = currentQuestion.value.id;
@@ -2115,9 +2187,9 @@
                   };
                   const badgeId = subjToBadge[currentStudySubjId.value];
                   if (badgeId) {
+                    checkAndUnlockBadge(badgeId);
                     const matchedBadge = ALL_BADGES.find(b => b.id === badgeId);
                     if (matchedBadge) {
-                      if (!unlockedBadges.value.includes(matchedBadge.id)) unlockedBadges.value.push(matchedBadge.id);
                       specialTitle.value = matchedBadge.name;
                       activeBadge.value = matchedBadge.id;
                     }
@@ -2140,9 +2212,9 @@
                   if (allSubjMastered) {
                     setTimeout(() => {
                       triggerCelebration(`全7科目・計7,000問の頂点に立ちました！\nあなたは無敵です！！`, true);
+                      checkAndUnlockBadge('badge_quiz_13');
                       const legendBadge = ALL_BADGES.find(b => b.id === 'badge_quiz_13');
                       if (legendBadge) {
-                        if (!unlockedBadges.value.includes(legendBadge.id)) unlockedBadges.value.push(legendBadge.id);
                         specialTitle.value = legendBadge.name;
                         activeBadge.value = legendBadge.id;
                         saveUserProfile();
@@ -2248,6 +2320,9 @@
             const content = studyChatInput.value;
             studyChatInput.value = '';
             chatCount.value++;
+            if (chatCount.value >= 1) checkAndUnlockBadge('badge_comm_01');
+            if (chatCount.value >= 100) checkAndUnlockBadge('badge_comm_02');
+            if (chatCount.value >= 500) checkAndUnlockBadge('badge_comm_03');
             
             // 即時UI反映
             const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -2383,7 +2458,10 @@
           
           const content = firmChatInput.value;
           firmChatInput.value = '';
-            chatCount.value++;
+          chatCount.value++;
+          if (chatCount.value >= 1) checkAndUnlockBadge('badge_comm_01');
+          if (chatCount.value >= 100) checkAndUnlockBadge('badge_comm_02');
+          if (chatCount.value >= 500) checkAndUnlockBadge('badge_comm_03');
             
             // 即時UI反映
             const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -2442,6 +2520,7 @@
           isFarmMember.value = true;
           isFirmOwner.value = false;
           firmRoute.value = 'chat';
+          checkAndUnlockBadge('badge_farm_02');
           firmChat.value.push({ sender: 'システム', text: `🏢 「${f.name}」に加入しました！まずは挨拶してみましょう。` });
           alert(`「${f.name}」に加入しました！`);
           const el = document.getElementById('firmChatArea');
@@ -2454,12 +2533,8 @@
           isFirmOwner.value = true;
           firmRoute.value = 'chat';
           
-          if (!unlockedBadges.value.includes('創業者')) {
-            unlockedBadges.value.push('創業者');
-            alert('🎉 ファームを設立しました！記念バッジ【創業者】を獲得！');
-          } else {
-            alert('🎉 ファームを設立しました！');
-          }
+          checkAndUnlockBadge('badge_farm_01');
+          alert('🎉 ファームを設立しました！');
           
           firmChat.value = [
             { sender: 'システム', text: `🏢 あなたが「${newFirmName.value}」を設立しました！メンバーを募集してファームを盛り上げましょう！` }
@@ -2509,6 +2584,8 @@
             return;
           }
           friendCount.value++;
+          if (friendCount.value >= 1) checkAndUnlockBadge('badge_comm_04');
+          if (friendCount.value >= 10) checkAndUnlockBadge('badge_comm_05');
           alert('フレンドを追加しました！（ダミー）');
         };
 
@@ -2531,6 +2608,9 @@
               badge: badges[Math.floor(Math.random() * badges.length)]
             });
           }
+          friendCount.value += count;
+          if (friendCount.value >= 1) checkAndUnlockBadge('badge_comm_04');
+          if (friendCount.value >= 10) checkAndUnlockBadge('badge_comm_05');
           alert(`現在のモードにダミーフレンドを${count}人追加しました。`);
         };
 
