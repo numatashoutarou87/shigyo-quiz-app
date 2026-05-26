@@ -2185,8 +2185,11 @@
           activeRoom.value = room;
           room.count++;
           if (room.type === 'chat') {
+            const el = document.getElementById('studyLogs');
+            if (el) el.innerHTML = '';
             studyLogs.value = [];
-            subscribeToRoom('self_study_room', studyLogs, (msg) => {
+            const targetRoomId = 'study_room_' + room.id;
+            subscribeToRoom(targetRoomId, studyLogs, (msg) => {
               const timeStr = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
               return { id: msg.id, time: timeStr, text: `<strong style="color:var(--accent-gold);">[${msg.avatar_badge}] ${msg.user_name}:</strong> ${msg.content}`, reactions: msg.reactions || {} };
             });
@@ -2418,6 +2421,7 @@
 
         const subscribeToRoom = async (roomId, targetArrayRef, formatMessage) => {
           if (currentChatChannel) {
+            await currentChatChannel.unsubscribe();
             await supa.removeChannel(currentChatChannel);
             currentChatChannel = null;
           }
@@ -2435,6 +2439,7 @@
             }
             currentChatChannel = supa.channel(`room_${roomId}`)
               .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, payload => {
+                if (payload.new && payload.new.room_id !== roomId) return;
                 if (payload.eventType === 'INSERT') {
                   if (payload.new.user_id !== currentUser.value) {
                     targetArrayRef.value.push(formatMessage(payload.new));
@@ -2475,8 +2480,9 @@
               if(el) el.scrollTop = el.scrollHeight;
             }, 100);
 
+            const currentRoomId = 'study_room_' + (activeRoom.value?.id || 'default');
             const { data, error } = await supa.from('messages').insert([{
-              room_id: 'self_study_room',
+              room_id: currentRoomId,
               user_id: currentUser.value,
               user_name: displayName.value,
               avatar_badge: activeBadgeDisplay.value,
