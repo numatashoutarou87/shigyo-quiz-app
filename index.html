@@ -2017,6 +2017,34 @@
           alert('ロード中の問題をすべて「2回正解状態」にしました。\n※あと1回正解でマスター除外対象になります。');
         };
 
+        const triggerDebugFullClear = () => {
+          if (!confirm('【警告】全7,000問を「1回正解」の状態に上書きします。\nよろしいですか？')) return;
+          
+          isLoading.value = true;
+          loadStatus.value = `デバッグ: 全問クリア処理中...`;
+          
+          setTimeout(() => {
+            const newCounts = {};
+            for(let subj = 1; subj <= 7; subj++) {
+              let baseCode = subj * 10000;
+              for(let q = 1; q <= 1000; q++) {
+                newCounts[baseCode + q] = Math.max((correctCounts.value[baseCode + q] || 0), 1);
+              }
+            }
+            correctCounts.value = { ...correctCounts.value, ...newCounts };
+            
+            totalAnswered.value = Math.max(totalAnswered.value, 7000);
+            checkAndUnlockBadge('badge_study_04');
+            checkAndUnlockBadge('badge_study_05');
+            checkAndUnlockBadge('badge_study_06');
+            
+            saveUserProfile();
+            
+            isLoading.value = false;
+            alert('デバッグ処理完了！全7,000問の正解回数を1に底上げしました。\n進捗同期のため画面をリロードします。');
+            window.location.reload();
+          }, 100);
+        };
 
         // --- LIVE EXAM (21:00) Logic ---
         let serverTimeOffset = 0;
