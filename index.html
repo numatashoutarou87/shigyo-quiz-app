@@ -1495,6 +1495,8 @@
           masteredBlocks.value = m.masteredBlocks || {};
           masteredSubjects.value = m.masteredSubjects || {};
           specialTitle.value = m.specialTitle || '';
+          
+          autoRepairMasteredBlocks(); // 過去データの自動スキャン＆救済を実行
         };
 
         const selectMode = (mode) => {
@@ -1526,6 +1528,10 @@
                 const loadedMB = {};
                 data.completed_blocks.forEach(key => loadedMB[key] = true);
                 masteredBlocks.value = loadedMB;
+                // loadModeData で上書きされないようにローカルキャッシュも更新
+                if (app_users[userId] && app_users[userId].modes && app_users[userId].modes['shindanshi']) {
+                  app_users[userId].modes['shindanshi'].masteredBlocks = loadedMB;
+                }
               }
             }
           } catch (e) {
@@ -1850,7 +1856,6 @@
           
           loadGlobalData();
           await syncUserProfile(currentUser.value);
-          autoRepairMasteredBlocks(); // 初期ロード時に全7000問の進捗をスキャン＆救済
           
           activeMode.value = null;
           authScreen.value = 'app';
