@@ -244,6 +244,9 @@
     .badge-grid-icon { font-size: 24px; margin-bottom: 8px; }
     .badge-grid-name { font-size: 10px; font-weight: bold; color: var(--primary-navy); line-height: 1.3; }
     .badge-modal-close { padding: 14px; width: 100%; background: var(--primary-navy); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    .badge-card-locked { filter: grayscale(1); opacity: 0.6; cursor: not-allowed !important; }
+    .badge-card-unlocked:hover { background: rgba(255,255,255,0.1) !important; transform: translateY(-2px); }
+    .badge-card-active { border-color: var(--accent-gold) !important; background: rgba(212, 175, 55, 0.1) !important; }
 
     /* OVERLAYS & EFFECTS */
     .paywall-overlay { position: absolute; inset: 0; background: rgba(10, 25, 47, 0.9); z-index: 200; display: flex; justify-content: center; align-items: center; padding: 20px; animation: fade-in 0.2s; }
@@ -456,18 +459,41 @@
     </div>
 
     <!-- BADGE SELECTION MODAL -->
-    <div v-if="showBadgeModal" class="badge-modal-overlay">
-      <div class="badge-modal">
-        <div class="badge-modal-header">
-          <h3>🎖️ バッジを変更する</h3>
+    <div v-if="showBadgeModal" class="badge-modal-overlay" style="align-items: center; justify-content: center; z-index: 9999; padding: 20px;">
+      <div class="badge-modal" style="width: 100%; max-width: 600px; max-height: 90vh; background: var(--primary-navy); display: flex; flex-direction: column; padding: 0;">
+        <div class="badge-modal-header" style="padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; background: #112240; border-top-left-radius: 20px; border-top-right-radius: 20px;">
+          <h3 style="margin: 0; color: var(--accent-gold);">🎖️ バッジコレクション ({{ unlockedBadges.length }} / {{ ALL_BADGES.length }})</h3>
         </div>
-        <div class="badge-grid">
-          <div class="badge-grid-item" v-for="b in ALL_BADGES" :key="b.id" :class="{active: activeBadge === b.id, locked: !unlockedBadges.includes(b.id)}" @click="equipBadge(b.id)">
-            <div class="badge-grid-icon">{{ !unlockedBadges.includes(b.id) ? '🔒' : b.icon }}</div>
-            <div class="badge-grid-name">{{ b.name }}</div>
+        <div class="badge-grid" style="overflow-y: auto; padding: 20px; flex: 1; display: grid; grid-template-columns: 1fr; gap: 12px; display: block;">
+          <div v-for="cat in ['profile', 'quiz', 'community', 'exam', 'farm']" :key="cat">
+            <h4 style="color: white; margin-bottom: 10px; border-left: 4px solid var(--accent-gold); padding-left: 8px; text-transform: uppercase;">{{ cat }}</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-bottom: 20px;">
+              <div v-for="b in ALL_BADGES.filter(x => x.category === cat)" :key="b.id" 
+                   :class="{'badge-card-active': activeBadge === b.id, 'badge-card-unlocked': unlockedBadges.includes(b.id), 'badge-card-locked': !unlockedBadges.includes(b.id)}" 
+                   @click="unlockedBadges.includes(b.id) ? equipBadge(b.id) : null"
+                   style="border-radius: 12px; padding: 12px; background: rgba(255,255,255,0.05); border: 2px solid transparent; display: flex; flex-direction: column; gap: 8px; transition: all 0.3s; cursor: pointer;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="font-size: 32px; background: rgba(255,255,255,0.1); border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                    {{ !unlockedBadges.includes(b.id) ? '🔒' : b.icon }}
+                  </div>
+                  <div style="flex: 1;">
+                    <div style="font-weight: bold; color: white; font-size: 14px;">{{ b.name }}</div>
+                    <div v-if="activeBadge === b.id" style="font-size: 10px; color: var(--accent-gold); font-weight: bold;">装備中</div>
+                  </div>
+                </div>
+                <div v-if="unlockedBadges.includes(b.id)" style="font-size: 11px; color: #bbb; line-height: 1.4; font-style: italic;">
+                  "{{ b.flavorText }}"
+                </div>
+                <div v-else style="font-size: 11px; color: #ffab91; line-height: 1.4; background: rgba(255,0,0,0.1); padding: 6px; border-radius: 6px;">
+                  <strong style="color: #ff5252;">獲得条件:</strong><br>{{ b.conditionText }}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <button class="badge-modal-close" @click="showBadgeModal = false">閉じる</button>
+        <div style="padding: 15px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; flex-shrink: 0; background: #112240;">
+          <button class="badge-modal-close" @click="showBadgeModal = false" style="margin: 0;">閉じる</button>
+        </div>
       </div>
     </div>
 
@@ -620,7 +646,7 @@
             <div class="status-card">
               <div class="status-header">
                 <span class="status-label">現在の称号</span>
-                <span class="highlight-gold">[{{ activeBadge }}] {{ currentTitle }}</span>
+                <span class="highlight-gold">[{{ activeBadgeDisplay }}] {{ currentTitle }}</span>
               </div>
               <div class="status-row">
                 <span class="status-label">Lv.{{ currentLevel }}</span>
@@ -666,10 +692,7 @@
                 </div>
               </div>
               
-              <div style="margin-top: 30px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; border: 1px dashed rgba(255,255,255,0.3);">
-                <p style="font-size: 12px; color: #aaa; margin-bottom: 8px;">※ローカル起動時はこちらから手動でJSONを読込</p>
-                <input type="file" @change="handleFileUpload" accept=".json" style="color: white; font-size: 14px;">
-              </div>
+
             </div>
           </div>
 
@@ -1009,7 +1032,7 @@
                   <div class="profile-hero-content">
                     <div style="position: relative; display: inline-block; margin-bottom: 15px;">
                       <div class="profile-avatar">👤</div>
-                      <div class="profile-badge-tag">{{ activeBadge }}</div>
+                      <div class="profile-badge-tag">{{ activeBadgeDisplay }}</div>
                     </div>
                     <div class="profile-name">
                       {{ displayName }}
@@ -1280,15 +1303,57 @@
 
         const showBadgeModal = ref(false);
         const ALL_BADGES = [
-          { id: '🔰 新人', name: '新人', icon: '🔰' },
-          { id: '日課の始まり', name: '日課の始まり', icon: '📅' },
-          { id: 'スワイプの鬼', name: 'スワイプの鬼', icon: '👆' },
-          { id: 'ゾーン突入', name: 'ゾーン突入', icon: '🔥' },
-          { id: '神の打率', name: '神の打率', icon: '🎯' },
-          { id: '10分間の支配者', name: '10分間の支配者', icon: '⏱️' },
-          { id: '完全無欠', name: '完全無欠', icon: '✨' },
-          { id: '創業者', name: '創業者', icon: '🏛️' }
+          { id: 'badge_profile_01', name: '初陣（ういじん）', icon: '🥚', conditionText: 'アプリに新規登録し、初めてマイページを開く', flavorText: '伝説の始まり。ここから未来を変えよう！', category: 'profile' },
+          { id: 'badge_profile_02', name: '三日坊主の壁突破', icon: '👣', conditionText: '連続ログイン日数が3日に達する', flavorText: 'まずは最初の3日！習慣化への第一歩です。', category: 'profile' },
+          { id: 'badge_profile_03', name: '習慣の悪魔', icon: '⏳', conditionText: '連続ログイン日数が21日に達する', flavorText: 'もう勉強しないと気持ち悪い。あなたは習慣を支配した！', category: 'profile' },
+          { id: 'badge_profile_04', name: '受験界の主（ぬし）', icon: '🏰', conditionText: '累計ログイン日数が100日を突破する', flavorText: '100日間の血の滲むような努力。合格はすぐそこです。', category: 'profile' },
+          { id: 'badge_profile_05', name: '新進気鋭の志士', icon: '🛡️', conditionText: 'ユーザーレベルがLv.10に到達する', flavorText: '基本スキル習得！一人前の受験生として第一歩を踏み出した。', category: 'profile' },
+          { id: 'badge_profile_06', name: '不屈のチャレンジャー', icon: '⚔️', conditionText: 'ユーザーレベルがLv.20に到達する', flavorText: '知識が定着し始める頃。ここからの伸びが本番だ！', category: 'profile' },
+          { id: 'badge_profile_07', name: '堅忍不抜（けんにんふばつ）', icon: '🪵', conditionText: 'ユーザーレベルがLv.30に到達する', flavorText: '基礎固め完了！ブレない実力が身についてきました。', category: 'profile' },
+          { id: 'badge_profile_08', name: '進撃の受験生', icon: '🐎', conditionText: 'ユーザーレベルがLv.40に到達する', flavorText: '応用力もバッチリ。周囲に差をつける実力派！', category: 'profile' },
+          { id: 'badge_profile_09', name: '鉄人', icon: '🏆', conditionText: 'ユーザーレベルがLv.50に到達する', flavorText: '折り返し地点突破！驚異のLv.50、素晴らしい精神力。', category: 'profile' },
+          { id: 'badge_profile_10', name: '知識の求道者', icon: '🏔️', conditionText: 'ユーザーレベルがLv.60に到達する', flavorText: 'もはや勉強は日常。深みのある知識が武器になる Hagakure。', category: 'profile' },
+          { id: 'badge_profile_11', name: '知勇兼備（ちゆうけんび）', icon: '🔮', conditionText: 'ユーザーレベルがLv.70に到達する', flavorText: '合格圏内が牙城に見えてきた。衰えぬ探求心！', category: 'profile' },
+          { id: 'badge_profile_12', name: '模試の常勝将軍', icon: '🦅', conditionText: 'ユーザーレベルがLv.80に到達する', flavorText: '圧倒的な存在感。あなたの実力はホンモノです。', category: 'profile' },
+          { id: 'badge_profile_13', name: '絶対なる賢者', icon: '🧙‍♂️', conditionText: 'ユーザーレベルがLv.90に到達する', flavorText: '神の領域まであと一息。全ての科目を極めつつある。', category: 'profile' },
+          { id: 'badge_profile_14', name: '生ける伝説（レジェンド）', icon: '👑', conditionText: 'ユーザーレベルがLv.100に到達する', flavorText: '全受験生の憧れ。あなたの背中をみんなが見ている！', category: 'profile' },
+
+          { id: 'badge_quiz_01', name: '最初の一歩', icon: '🎯', conditionText: '初めてクイズを10問解き終える', flavorText: 'ナイスホップ！この調子で問題を潰していこう。', category: 'quiz' },
+          { id: 'badge_quiz_02', name: '千手観音', icon: '✍️', conditionText: 'クイズの累計解答数が1,000問を突破する', flavorText: '千の手で問題を解きまくる。圧倒的な演習量！', category: 'quiz' },
+          { id: 'badge_quiz_03', name: '問題集キラー', icon: '🪓', conditionText: 'クイズの累計解答数が5,000問を突破する', flavorText: '5,000問撃破！過去問があなたの血肉に変わっていく。', category: 'quiz' },
+          { id: 'badge_quiz_04', name: 'ゾーン突入', icon: '🌀', conditionText: '連続正解（コンボ）が30 COMBOに達する', flavorText: '脳が冴え渡っている！正解の軌道が見えている状態。', category: 'quiz' },
+          { id: 'badge_quiz_05', name: '限界突破', icon: '🔥', conditionText: '連続正解（コンボ）が50 COMBOに達する', flavorText: '50問連続正解！あなたの集中力は神の領域へ。', category: 'quiz' },
+          { id: 'badge_quiz_06', name: '経済学の覇者', icon: '📈', conditionText: '経済学の全問題を3回以上正解する', flavorText: '複雑なグラフも、あなたにとってはただの地図！', category: 'quiz' },
+          { id: 'badge_quiz_07', name: '財務会計の魔術師', icon: '📊', conditionText: '財務会計の全問題を3回以上正解する', flavorText: 'B/S、P/Lが美しく見える。数字を支配せよ！', category: 'quiz' },
+          { id: 'badge_quiz_08', name: '企業経営の戦略家', icon: '♟️', conditionText: '企業経営理論の全問題を3回以上正解する', flavorText: '経営コンサルタントの眼差し。戦略は完璧だ。', category: 'quiz' },
+          { id: 'badge_quiz_09', name: '運営管理の統括官', icon: '🏭', conditionText: '運営管理の全問題を3回以上正解する', flavorText: '店舗も工場も、あなたの緻密な計算で効率化される！', category: 'quiz' },
+          { id: 'badge_quiz_10', name: '経営法務の守護神', icon: '⚖️', conditionText: '経営法務の全問題を3回以上正解する', flavorText: '法律の壁を突き破る！知的財産も会社法も手玉に取る。', category: 'quiz' },
+          { id: 'badge_quiz_11', name: '情報システムの導師', icon: '💻', conditionText: '経営情報システムの全問題を3回以上正解する', flavorText: 'ITの迷宮をハックした。最新テクノロジーを味方に！', category: 'quiz' },
+          { id: 'badge_quiz_12', name: '中小企業政策の伝道師', icon: '🗾', conditionText: '中小企業経営・政策の全問題を3回以上正解する', flavorText: '日本のエコノミーを支える白書を完全暗記！', category: 'quiz' },
+          { id: 'badge_quiz_13', name: 'コンプリート・レジェンド', icon: '🌌', conditionText: '全7科目・計7,000問すべてをマスター（各3回以上正解）する', flavorText: '7,000問完全制覇！あなたは診断士の神、いや、生ける解答解説集だ！！', category: 'quiz' },
+
+          { id: 'badge_comm_01', name: '初書き込み', icon: '💬', conditionText: 'チャットに初めて発言する', flavorText: '仲間への挨拶完了！孤独な戦いは終わりを告げた。', category: 'community' },
+          { id: 'badge_comm_02', name: '拡声器', icon: '📢', conditionText: 'チャットの累計発言数が100回を突破する', flavorText: 'あなたの言葉が、コミュニティに活気を与えています！', category: 'community' },
+          { id: 'badge_comm_03', name: '歩く相談窓口', icon: '🤝', conditionText: 'チャットの累計発言数が500回を突破する', flavorText: '受験生たちのメンター。あなたの解説に救われた人がいる。', category: 'community' },
+          { id: 'badge_comm_04', name: '初めての友', icon: '🤝', conditionText: '初めてフレンド登録が1人成立する', flavorText: '同志ができた！切磋琢磨して共に合格へ。', category: 'community' },
+          { id: 'badge_comm_05', name: '人脈の達人', icon: '👥', conditionText: '相互フレンドの登録数が10人に到達する', flavorText: '強力なネットワーク。1人では届かない場所へ、みんなで行く。', category: 'community' },
+          { id: 'badge_comm_06', name: 'ファームの精神的支柱', icon: '🕯️', conditionText: '他人の発言に「いいね」を累計100回送る', flavorText: 'あなたの優しいリアクションが、みんなのモチベーション！', category: 'community' },
+
+          { id: 'badge_exam_01', name: '初陣の証明', icon: '🎟️', conditionText: '21時一斉模試に初めて参加し、最後まで解ききる', flavorText: '本番さながらの緊張感。ナイスファイト！', category: 'exam' },
+          { id: 'badge_exam_02', name: '皆勤賞', icon: '📅', conditionText: '一斉模試への累計参加日数が30回を突破する', flavorText: '雨の日も風の日も、21時に戦い続けた努力の天才。', category: 'exam' },
+          { id: 'badge_exam_03', name: '精密機械', icon: '🤖', conditionText: '一斉模試で、ケアレスミスなく100点満点を獲得する', flavorText: '誤答確率0%。あなたの知識に死角はありません。', category: 'exam' },
+
+          { id: 'badge_farm_01', name: '開拓者（パイオニア）', icon: '🚩', conditionText: '自分で新しいファームを立ち上げ、創設者になる', flavorText: '新たな旗を掲げた！あなたのリーダーシップに期待。', category: 'farm' },
+          { id: 'badge_farm_02', name: '新緑の芽吹き', icon: '🌱', conditionText: '既存のファームに初めて加入する', flavorText: 'ファームの一員に！チームのために汗をかおう。', category: 'farm' },
+          { id: 'badge_farm_03', name: '一番槍（いちばんやり）', icon: '🚀', conditionText: '所属ファーム内の週間獲得EXPランキングで1位になる', flavorText: 'チームを牽引する特攻隊長！圧倒的な稼ぎ頭です。', category: 'farm' },
+          { id: 'badge_farm_04', name: '大将軍', icon: '🏯', conditionText: '所属ファームのメンバー全員の累計獲得EXPが1,000,000 EXPを突破する', flavorText: '伝説的なギルド。あなたたちの結束力は最強だ。', category: 'farm' },
+          { id: 'badge_farm_05', name: '一蓮托生（いちれんたくしょう）', icon: '🤝', conditionText: '同じファームのメンバー3人以上と同時に21時模試に参加する', flavorText: '同じ釜の飯を食う戦友たち。全員で合格の切符を掴み取る！', category: 'farm' }
         ];
+
+        const activeBadgeDisplay = computed(() => {
+          const b = ALL_BADGES.find(x => x.id === activeBadge.value);
+          return b ? `${b.icon} ${b.name}` : activeBadge.value;
+        });
 
         const equipBadge = (badgeId) => {
           if (unlockedBadges.value.includes(badgeId)) {
@@ -1776,21 +1841,6 @@
           alert('ロード中の問題をすべて「2回正解状態」にしました。\n※あと1回正解でマスター除外対象になります。');
         };
 
-        const handleFileUpload = (event) => {
-          const input = event.target;
-          if (!input.files[0]) return;
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            try {
-              const rawData = JSON.parse(e.target.result);
-              rawQuestions.value = rawData.map(normalizeQuestion);
-              loadStatus.value = '手動読込成功';
-              alert(`読み込み成功（計 ${rawQuestions.value.length} 問）`);
-            } catch (err) { alert('解析エラー'); }
-            input.value = '';
-          };
-          reader.readAsText(input.files[0]);
-        };
 
         // --- LIVE EXAM (21:00) Logic ---
         let serverTimeOffset = 0;
@@ -2044,15 +2094,28 @@
                 
                 if (subjectMastered && !masteredSubjects.value[currentStudySubjId.value]) {
                   masteredSubjects.value[currentStudySubjId.value] = true;
+                  const subjToBadge = {
+                    'keizai': 'badge_quiz_06',
+                    'zaimu': 'badge_quiz_07',
+                    'kigyou': 'badge_quiz_08',
+                    'unei': 'badge_quiz_09',
+                    'houmu': 'badge_quiz_10',
+                    'jouhou': 'badge_quiz_11',
+                    'chusho': 'badge_quiz_12'
+                  };
+                  const badgeId = subjToBadge[currentStudySubjId.value];
+                  if (badgeId) {
+                    const matchedBadge = ALL_BADGES.find(b => b.id === badgeId);
+                    if (matchedBadge) {
+                      if (!unlockedBadges.value.includes(matchedBadge.id)) unlockedBadges.value.push(matchedBadge.id);
+                      specialTitle.value = matchedBadge.name;
+                      activeBadge.value = matchedBadge.id;
+                    }
+                  }
+                  saveUserProfile();
+                  
                   const subjName = SUBJECTS.find(s => s.id === currentStudySubjId.value)?.name || '';
                   const cleanName = subjName.replace(/[^ぁ-んァ-ン一-龥a-zA-Z]/g, '');
-                  
-                  // 専用称号の解放
-                  const newTitle = `${cleanName}の覇者`;
-                  if (!unlockedBadges.value.includes(newTitle)) unlockedBadges.value.push(newTitle);
-                  specialTitle.value = newTitle;
-                  activeBadge.value = newTitle;
-                  saveUserProfile();
                   
                   triggerCelebration(`【祝・${cleanName}マスター！】\n1,000問の壁を突破！この努力は裏切らない！`);
                   
@@ -2067,11 +2130,13 @@
                   if (allSubjMastered) {
                     setTimeout(() => {
                       triggerCelebration(`全7科目・計7,000問の頂点に立ちました！\nあなたは無敵です！！`, true);
-                      const legendTitle = '👑 全知全能の神';
-                      if (!unlockedBadges.value.includes(legendTitle)) unlockedBadges.value.push(legendTitle);
-                      specialTitle.value = legendTitle;
-                      activeBadge.value = legendTitle;
-                      saveUserProfile();
+                      const legendBadge = ALL_BADGES.find(b => b.id === 'badge_quiz_13');
+                      if (legendBadge) {
+                        if (!unlockedBadges.value.includes(legendBadge.id)) unlockedBadges.value.push(legendBadge.id);
+                        specialTitle.value = legendBadge.name;
+                        activeBadge.value = legendBadge.id;
+                        saveUserProfile();
+                      }
                     }, 4000);
                   }
                 }
@@ -2176,7 +2241,7 @@
             
             // 即時UI反映
             const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            studyLogs.value.push({ time: timeStr, text: `<strong style="color:var(--accent-gold);">[${activeBadge.value}] ${displayName.value}:</strong> ${content}` });
+            studyLogs.value.push({ time: timeStr, text: `<strong style="color:var(--accent-gold);">[${activeBadgeDisplay.value}] ${displayName.value}:</strong> ${content}` });
             setTimeout(() => {
               const el = document.getElementById('studyLogs');
               if(el) el.scrollTop = el.scrollHeight;
@@ -2186,7 +2251,7 @@
               room_id: 'self_study_room',
               user_id: currentUser.value,
               user_name: displayName.value,
-              avatar_badge: activeBadge.value,
+              avatar_badge: activeBadgeDisplay.value,
               content: content
             }]);
             if (error) {
@@ -2314,7 +2379,7 @@
             const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             firmChat.value.push({ 
               isMe: true, 
-              sender: `[${activeBadge.value}] ${displayName.value}`, 
+              sender: `[${activeBadgeDisplay.value}] ${displayName.value}`, 
               text: content,
               time: timeStr
             });
@@ -2327,7 +2392,7 @@
               room_id: 'farm_room_' + myFarmId.value,
               user_id: currentUser.value,
               user_name: displayName.value,
-              avatar_badge: activeBadge.value,
+              avatar_badge: activeBadgeDisplay.value,
               content: content
             }]);
             if (error) {
@@ -2550,7 +2615,7 @@
           agreedToTerms, showTermsModal, showPrivacyModal,
 
           isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, currentTitle, currentLevel, nextLevelExp, currentLevelStartExp, expProgressPercent,
-          chatCount, canSendChat, dailyCorrect, dailyCombo, unlockedBadges, activeBadge,
+          chatCount, canSendChat, dailyCorrect, dailyCombo, unlockedBadges, activeBadge, activeBadgeDisplay,
           activeTab, studyRoute, profileTab,
           loadStatus, isLoading, paywallConfig, showPaywall,
           
@@ -2558,7 +2623,7 @@
           
           masteredBlocks, masteredSubjects, showConfetti, celebrationMessage, celebrationTitle,
           
-          goToStudyRoomLobby, handleFileUpload, setAllTo2,
+          goToStudyRoomLobby, setAllTo2,
           SUBJECTS, STUDY_ROOMS, lobbyActiveTab, expandedSubject, quizSettings, correctCounts,
           activeRoom, getRoomStatusText, getRoomStatusClass, enterRoomNew, startQuizFlow,
           quizQueue, currentQuestionIndex, currentQuestion, isFinished, showFeedback, isCorrect, correctCount, handleAnswer, nextQuestion,
