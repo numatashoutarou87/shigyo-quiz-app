@@ -1,0 +1,2589 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>士業向 コミュニティ学習アプリ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* =========================================
+       CSS
+       ========================================= */
+    :root {
+      --primary-navy: #0A192F;
+      --secondary-navy: #112240;
+      --accent-gold: #D4AF37;
+      --accent-gold-light: #F3E5AB;
+      --bg-light: #F8F9FA;
+      --bg-white: #FFFFFF;
+      --text-main: #333333;
+      --text-sub: #666666;
+      --text-inverse: #FFFFFF;
+      --success-color: #2E7D32;
+      --danger-color: #C62828;
+      --border-color: #E0E0E0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', 'Noto Sans JP', sans-serif; background-color: #E9ECEF; color: var(--text-main); line-height: 1.6; height: 100vh; display: flex; justify-content: center; align-items: center; }
+    [v-cloak] { display: none; }
+
+    .app-container { width: 100%; max-width: 414px; height: 100vh; max-height: 896px; background-color: var(--bg-light); display: flex; flex-direction: column; position: relative; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
+    
+    .app-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .screen { flex: 1; display: flex; flex-direction: column; overflow: hidden; margin-bottom: 60px; }
+    .quiz-screen { margin-bottom: 0; }
+
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+    /* --- Mode Selection Screen --- */
+    .mode-select-screen { background: var(--primary-navy); padding: 40px 20px; overflow-y: auto; align-items: center; justify-content: flex-start; }
+    .mode-select-title { color: var(--accent-gold); font-size: 24px; font-weight: bold; margin-bottom: 30px; text-align: center; letter-spacing: 2px; margin-top: 20px; }
+    .mode-card { width: 100%; max-width: 340px; background: white; border-radius: 16px; padding: 24px; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); transition: 0.3s; position: relative; overflow: hidden; }
+    .mode-card.active { border: 3px solid var(--accent-gold); cursor: pointer; }
+    .mode-card.active:hover { transform: translateY(-4px); box-shadow: 0 15px 40px rgba(212, 175, 55, 0.4); }
+    .mode-card.disabled { filter: grayscale(100%); opacity: 0.7; cursor: not-allowed; }
+    .mode-icon { font-size: 48px; margin-bottom: 16px; }
+    .mode-name { font-size: 20px; font-weight: bold; color: var(--primary-navy); margin-bottom: 8px; }
+    .mode-desc { font-size: 13px; color: var(--text-sub); text-align: center; font-weight: bold; }
+    .mode-badge-cs { position: absolute; top: 16px; right: -30px; background: #C62828; color: white; padding: 4px 30px; font-size: 11px; font-weight: bold; transform: rotate(45deg); letter-spacing: 1px; }
+
+    /* --- Friend Screen --- */
+    .friend-list-header { position: sticky; top: 0; background: var(--primary-navy); padding-bottom: 15px; z-index: 10; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px; }
+    .friend-search { width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: white; font-size: 14px; outline: none; }
+    .friend-search:focus { border-color: var(--accent-gold); }
+    .friend-item { display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; }
+    .friend-item:hover { background: rgba(255,255,255,0.1); }
+    .friend-icon { font-size: 32px; margin-right: 15px; }
+    .friend-info { flex: 1; }
+    .friend-name { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+    .friend-level { font-size: 12px; color: var(--accent-gold-light); }
+    .friend-chat-screen { display: flex; flex-direction: column; height: 100%; max-height: calc(100vh - 160px); }
+    .friend-chat-header { display: flex; align-items: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px; }
+
+    /* --- Auth Screens (Login / Register) --- */
+    .auth-screen { margin-bottom: 0; background: var(--primary-navy); justify-content: center; align-items: center; padding: 20px; }
+    .auth-card { background: white; padding: 30px 20px; border-radius: 16px; width: 100%; max-width: 340px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); border-top: 4px solid var(--accent-gold); }
+    .auth-card h2 { text-align: center; color: var(--primary-navy); margin-bottom: 24px; font-size: 20px; font-weight: bold; }
+    .auth-input { width: 100%; padding: 14px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
+    .auth-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--accent-gold), #B8860B); color: var(--primary-navy); border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4); margin-bottom: 16px; transition: 0.2s; }
+    .auth-btn:hover { transform: translateY(-2px); }
+    .auth-link { display: block; text-align: center; font-size: 13px; color: var(--text-sub); cursor: pointer; text-decoration: underline; }
+    .auth-error { color: var(--danger-color); font-size: 12px; text-align: center; margin-bottom: 12px; font-weight: bold; }
+
+    /* Dev Panel */
+    .dev-panel { background: #E0E0E0; padding: 6px 15px; display: flex; flex-direction: column; font-size: 11px; z-index: 100; border-bottom: 1px solid #ccc; }
+    .dev-panel-title { font-weight: bold; margin-bottom: 4px; color: #333; }
+    .dev-controls { display: flex; justify-content: space-between; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .dev-btn { background: #555; color: white; border: none; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+
+    /* Toggle */
+    .toggle-switch { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { width: 34px; height: 18px; background-color: #999; border-radius: 18px; position: relative; transition: .4s; margin-right: 6px; }
+    .toggle-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; border-radius: 50%; transition: .4s; }
+    input:checked + .toggle-slider { background-color: var(--accent-gold); }
+    input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+    /* Header & Nav */
+    .header { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-white); border-bottom: 1px solid var(--border-color); }
+    .header h2 { font-size: 16px; color: var(--primary-navy); font-weight: bold; margin: 0 auto;}
+    .back-btn { background: none; border: none; font-size: 14px; color: var(--text-sub); cursor: pointer; font-weight: bold; position: absolute; left: 20px; }
+    
+    .bottom-nav { position: absolute; bottom: 0; width: 100%; height: 60px; background: var(--bg-white); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; align-items: center; z-index: 50; }
+    .nav-item { flex: 1; background: none; border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-sub); cursor: pointer; transition: 0.2s; }
+    .nav-icon { font-size: 20px; margin-bottom: 2px; }
+    .nav-item span { font-size: 10px; font-weight: bold; }
+    .nav-item.active { color: var(--accent-gold); }
+    .nav-item.active .nav-icon { transform: scale(1.1); }
+
+    /* DASHBOARD (Home Screen) */
+    .dashboard-screen { background: var(--primary-navy); color: var(--text-inverse); overflow-y: auto; }
+    .exam-banner { background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d); color: white; text-align: center; padding: 12px; font-weight: bold; position: relative; z-index: 10; font-size: 13px; }
+    .exam-banner.live { background: linear-gradient(135deg, #C62828, #F3E5AB); animation: pulse 2s infinite; color: var(--primary-navy); }
+    .dashboard-header { padding: 30px 20px 20px; text-align: center; }
+    .dashboard-header h1 { font-size: 24px; color: var(--accent-gold); margin-bottom: 8px; letter-spacing: 1px; }
+    
+    .status-card { background: var(--secondary-navy); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 12px; padding: 20px; margin: 0 20px 20px; }
+    .status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .status-label { font-size: 13px; color: #aaa; }
+    .highlight-gold { color: var(--accent-gold); font-weight: bold; font-size: 14px; }
+    .status-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .status-value { font-size: 20px; font-weight: bold; }
+    .progress-bar-container { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+    .progress-bar-fill { height: 100%; background: var(--accent-gold); transition: width 0.5s; }
+
+    .subject-section { padding: 0 20px 20px; }
+    .subject-section h3 { font-size: 14px; color: var(--accent-gold-light); margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+    .subject-btn { width: 100%; padding: 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(212,175,55,0.4); border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .subject-btn:hover, .subject-btn:active { background: rgba(212,175,55,0.1); transform: translateY(-2px); }
+
+    .loading-overlay { position: absolute; inset: 0; background: rgba(10,25,47,0.9); z-index: 300; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--accent-gold); }
+    .spinner { border: 4px solid rgba(212,175,55,0.2); border-top: 4px solid var(--accent-gold); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 16px; }
+
+    /* STUDY ROOM SELECTION */
+    .study-rooms { background: var(--bg-light); padding: 20px; overflow-y: auto; flex: 1;}
+    .room-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; border: 2px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px; }
+    .room-card h3 { color: var(--primary-navy); font-size: 16px; }
+    .room-card .room-desc { font-size: 13px; color: var(--text-sub); }
+    .room-card .room-meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #888; font-weight: bold; }
+    .room-btn { padding: 10px; background: var(--primary-navy); color: var(--accent-gold); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+    /* SELECT SCREEN (Filters) */
+    .select-content { padding: 24px; flex: 1; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; background: var(--bg-light); }
+    .filter-group { display: flex; flex-direction: column; gap: 8px; }
+    .filter-label { font-size: 14px; font-weight: bold; color: var(--primary-navy); }
+    .select-wrapper { position: relative; }
+    .select-wrapper select { width: 100%; padding: 14px; appearance: none; border: 1px solid var(--border-color); border-radius: 8px; font-size: 16px; background: white; color: var(--text-main); cursor: pointer; }
+    .select-wrapper::after { content: "▼"; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #888; pointer-events: none; }
+    .start-btn { margin-top: 20px; padding: 18px; background: var(--primary-navy); color: var(--accent-gold); border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; }
+
+    /* QUIZ & EXAM CORE */
+    .quiz-screen { background: #f0f2f5; display: flex; flex-direction: column; }
+    .quiz-split { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+    .main-content { flex: 6; display: flex; flex-direction: column; position: relative; padding: 20px; overflow: hidden; }
+    .card-stack-container { flex: 1; position: relative; perspective: 1000px; display: flex; justify-content: center; align-items: center; margin-bottom: 20px; }
+    .quiz-card { width: 100%; height: 100%; max-height: 400px; background: var(--bg-white); border-radius: 16px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08); position: absolute; display: flex; flex-direction: column; user-select: none; transition: transform 0.1s; overflow: hidden; border: 1px solid var(--border-color); }
+    .bg-card { transform: scale(0.95) translateY(15px); z-index: 1; background: #fafafa; }
+    .active-card { z-index: 2; cursor: grab; }
+    .active-card:active { cursor: grabbing; }
+    .card-header { padding: 10px 16px; background: var(--primary-navy); color: white; display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
+    .card-meta { font-weight: bold; color: var(--accent-gold); }
+    .question-content { padding: 20px; flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+    .q-statement { font-size: 16px; font-weight: 700; line-height: 1.6; color: var(--primary-navy); margin-bottom: auto; }
+    
+    .feedback-content { padding: 20px; flex: 1; display: flex; flex-direction: column; text-align: center; overflow-y: auto; }
+    .feedback-result { font-size: 24px; font-weight: bold; margin-bottom: 12px; }
+    .feedback-result.correct { color: var(--success-color); }
+    .feedback-result.incorrect { color: var(--danger-color); }
+    .normal-exp { color: var(--primary-navy); font-weight: bold; margin-bottom: 10px; }
+    .explanation-box { background: var(--bg-light); padding: 12px; border-radius: 8px; margin-bottom: auto; text-align: left; border-left: 4px solid var(--accent-gold); }
+    .explanation-text { font-size: 13px; line-height: 1.6; font-weight: 600; }
+    .next-btn { padding: 12px; border-radius: 12px; border: none; background: var(--primary-navy); color: var(--accent-gold); font-weight: bold; cursor: pointer; margin-top: 10px; }
+    
+    .action-buttons { display: flex; justify-content: center; gap: 30px; padding: 0 0 10px; }
+    .btn-cross, .btn-circle { width: 60px; height: 60px; border-radius: 50%; border: none; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.1); background: white; transition: 0.2s; }
+    .btn-cross { color: var(--danger-color); }
+    .btn-circle { color: var(--success-color); }
+
+    .result-section { flex: 1; display: flex; align-items: center; justify-content: center; }
+    .result-card { background: white; padding: 40px 20px; border-radius: 16px; text-align: center; width: 100%; box-shadow: 0 8px 30px rgba(0,0,0,0.05); }
+    .primary-btn { padding: 16px; background: var(--primary-navy); color: var(--accent-gold); border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; }
+
+    .exam-timer-bar { height: 6px; background: var(--accent-gold); width: 100%; transition: width 1s linear; }
+
+    /* STUDY TIMELINE (Inside Quiz Screen) */
+    .study-timeline-area { flex: 4; display: flex; flex-direction: column; background: var(--bg-white); border-top: 2px solid var(--border-color); overflow: hidden; }
+    .timeline-header { padding: 8px 16px; background: #e9ecef; font-size: 12px; font-weight: bold; color: var(--primary-navy); display: flex; justify-content: space-between; }
+    .timeline-logs { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .log-item { font-size: 12px; padding: 6px 10px; background: var(--bg-light); border-radius: 8px; border-left: 3px solid var(--accent-gold); animation: fade-in 0.3s; }
+    .log-time { color: #888; font-size: 10px; margin-right: 6px; }
+
+    /* CHAT INPUT */
+    .chat-input-area { display: flex; padding: 8px; border-top: 1px solid #ddd; background: white; gap: 6px; }
+    .chat-input-area input { flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 20px; font-size: 13px; outline: none; }
+    .chat-input-area input:disabled { background: #eee; cursor: not-allowed; }
+    .chat-input-area button { padding: 0 16px; background: var(--accent-gold); color: var(--primary-navy); border: none; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer; }
+    .chat-input-area button:disabled { background: #ccc; color: #888; cursor: not-allowed; }
+
+    /* FIRM */
+    .firm-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-light); }
+    .firm-member-section { padding: 16px; background: white; border-bottom: 1px solid var(--border-color); }
+    .member-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .member-item { background: #f0f0f0; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; color: var(--text-main); }
+    .firm-chat-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .chat-title { font-size: 13px; color: var(--primary-navy); padding: 10px 16px; background: #e9ecef; }
+    .firm-chat-timeline { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .firm-msg { max-width: 80%; background: white; padding: 10px; border-radius: 12px; border-top-left-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); animation: fade-in 0.2s; }
+    .my-msg { align-self: flex-end; background: var(--primary-navy); color: white; border-top-left-radius: 12px; border-top-right-radius: 2px; }
+    .system-msg { align-self: center; background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; border-radius: 8px; font-weight: bold; max-width: 90%; text-align: center; font-size: 12px; }
+    .firm-msg-sender { font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
+    .firm-msg-text { font-size: 14px; }
+
+    /* PROFILE & BADGES */
+    .profile-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-light); }
+    .profile-tabs-header { display: flex; background: white; border-bottom: 1px solid #ddd; }
+    .ptab { flex: 1; text-align: center; padding: 14px; font-size: 14px; font-weight: bold; color: #888; cursor: pointer; border-bottom: 2px solid transparent; }
+    .ptab.active { color: var(--primary-navy); border-bottom-color: var(--accent-gold); }
+    .profile-scroll { flex: 1; overflow-y: auto; padding: 20px; }
+    
+    .self-intro-box { background: white; padding: 16px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    .self-intro-box h3 { font-size: 14px; color: var(--primary-navy); margin-bottom: 8px; }
+    .self-intro-box textarea { width: 100%; height: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-family: inherit; font-size: 13px; resize: none; }
+    .save-btn { margin-top: 8px; padding: 6px 12px; background: var(--primary-navy); color: var(--accent-gold); border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
+    /* Profile Enhanced Status */
+    .profile-hero { background: linear-gradient(135deg, var(--secondary-navy), var(--primary-navy)); padding: 30px 20px; text-align: center; border-bottom: 2px solid var(--accent-gold); position: relative; overflow: hidden; }
+    .profile-hero::after { content: ''; position: absolute; inset: 0; background: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 0L100 50L50 100L0 50Z" fill="rgba(212,175,55,0.03)"/></svg>'); z-index: 1; }
+    .profile-hero-content { position: relative; z-index: 2; }
+    .profile-avatar { width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 3px solid var(--accent-gold); margin: 0 auto 15px; display: flex; justify-content: center; align-items: center; font-size: 40px; box-shadow: 0 0 20px rgba(212,175,55,0.3); }
+    .profile-badge-tag { position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); background: var(--accent-gold); color: var(--primary-navy); font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 12px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+    .profile-name { font-size: 22px; font-weight: bold; color: white; margin-bottom: 5px; }
+    .profile-title { font-size: 14px; color: var(--accent-gold-light); font-weight: bold; letter-spacing: 1px; margin-bottom: 15px; }
+    .profile-level-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: white; }
+    .profile-level-text { font-size: 18px; font-weight: bold; }
+    .profile-exp-text { font-size: 14px; color: #aaa; }
+    .profile-progress-bar-container { width: 100%; height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden; margin-bottom: 8px; }
+    .profile-progress-bar-fill { height: 100%; background: linear-gradient(90deg, #D4AF37, #F3E5AB); transition: width 0.5s; }
+    .profile-next-exp { font-size: 11px; color: #888; text-align: right; }
+    .change-badge-btn { padding: 10px 20px; background: transparent; border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 15px; }
+    .change-badge-btn:hover { background: rgba(212,175,55,0.1); }
+
+    /* Badge Selection Modal */
+    .badge-modal-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 500; display: flex; justify-content: center; align-items: flex-end; animation: fade-in 0.2s; }
+    .badge-modal { background: var(--bg-light); width: 100%; max-width: 414px; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 24px; animation: slide-up 0.3s; max-height: 80vh; display: flex; flex-direction: column; }
+    .badge-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .badge-modal-header h3 { font-size: 18px; color: var(--primary-navy); margin: 0; }
+    .badge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; overflow-y: auto; flex: 1; padding-bottom: 20px; }
+    .badge-grid-item { background: white; border-radius: 12px; padding: 15px 5px; text-align: center; border: 2px solid transparent; box-shadow: 0 4px 10px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 80px; }
+    .badge-grid-item.active { border-color: var(--accent-gold); background: rgba(212,175,55,0.05); }
+    .badge-grid-item.locked { opacity: 0.5; filter: grayscale(100%); cursor: not-allowed; }
+    .badge-grid-icon { font-size: 24px; margin-bottom: 8px; }
+    .badge-grid-name { font-size: 10px; font-weight: bold; color: var(--primary-navy); line-height: 1.3; }
+    .badge-modal-close { padding: 14px; width: 100%; background: var(--primary-navy); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+
+    /* OVERLAYS & EFFECTS */
+    .paywall-overlay { position: absolute; inset: 0; background: rgba(10, 25, 47, 0.9); z-index: 200; display: flex; justify-content: center; align-items: center; padding: 20px; animation: fade-in 0.2s; }
+    .paywall-box { background: white; width: 100%; max-width: 340px; padding: 30px 20px; border-radius: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 2px solid var(--accent-gold); }
+    .paywall-icon { font-size: 40px; margin-bottom: 10px; }
+
+    /* HOME SUBJECTS ACCORDION */
+    .subject-list { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+    .subject-block-btn { padding: 16px; background: white; border: 1px solid var(--border-color); border-radius: 12px; font-weight: bold; color: var(--primary-navy); display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+    .subject-block-btn.open { background: var(--primary-navy); color: white; border-color: var(--primary-navy); }
+    .block-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 12px 0; animation: fade-in 0.2s; }
+    .block-item-btn { padding: 12px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; font-weight: bold; color: var(--primary-navy); cursor: pointer; text-align: center; transition: 0.2s; }
+    .block-item-btn:hover { background: var(--accent-gold); color: var(--primary-navy); border-color: var(--accent-gold); }
+
+    /* TOGGLE SWITCHES (SETTINGS) */
+    .settings-panel { background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    .settings-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .settings-row:last-child { margin-bottom: 0; }
+    .settings-label { font-size: 13px; font-weight: bold; color: var(--text-main); }
+
+    /* LOBBY 30 ROOMS */
+    .lobby-tabs { display: flex; background: white; border-bottom: 1px solid #ddd; margin: -24px -24px 20px; }
+    .lobby-tab { flex: 1; text-align: center; padding: 16px; font-size: 14px; font-weight: bold; color: #888; cursor: pointer; border-bottom: 3px solid transparent; }
+    .lobby-tab.active { color: var(--primary-navy); border-bottom-color: var(--accent-gold); }
+    .room-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding-bottom: 20px; }
+    .room-card-new { background: white; padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; flex-direction: column; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.02); }
+    .room-card-new:hover { border-color: var(--accent-gold); transform: translateY(-2px); }
+    .room-card-title { font-size: 14px; font-weight: bold; color: var(--primary-navy); margin-bottom: 8px; line-height: 1.3; }
+    .room-card-meta { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
+    .room-card-count { font-size: 12px; color: #666; font-family: monospace; font-weight: bold; }
+    .room-status-badge { font-size: 10px; padding: 4px 8px; border-radius: 10px; font-weight: bold; color: white; }
+    .status-empty { background: #0F9D58; }
+    .status-normal { background: #F4B400; }
+    .status-full { background: #DB4437; }
+
+    .paywall-box h2 { color: var(--primary-navy); font-size: 18px; margin-bottom: 16px; font-weight: bold; }
+    .paywall-box p { font-size: 14px; color: var(--text-sub); margin-bottom: 24px; line-height: 1.6; white-space: pre-wrap; }
+    .subscribe-btn { padding: 16px; width: 100%; background: linear-gradient(135deg, var(--accent-gold), #B8860B); border: none; border-radius: 12px; color: var(--primary-navy); font-weight: bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4); margin-bottom: 10px;}
+    .close-btn { padding: 12px; width: 100%; background: transparent; border: none; color: var(--text-sub); font-weight: bold; cursor: pointer; }
+
+    .levelup-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 400; display: flex; flex-direction: column; justify-content: center; align-items: center; animation: fade-in 0.3s; }
+    .levelup-text { font-size: 36px; font-weight: bold; color: var(--accent-gold); text-shadow: 0 0 20px rgba(212,175,55,0.8); animation: levelup-scale 3s ease-out; }
+    .levelup-sub { font-size: 18px; color: white; margin-top: 10px; animation: levelup-scale 3s ease-out; }
+
+    .badge-toast { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: var(--accent-gold); color: var(--primary-navy); padding: 12px 24px; border-radius: 30px; font-weight: bold; font-size: 14px; box-shadow: 0 10px 20px rgba(0,0,0,0.2); z-index: 350; animation: toast-slide 4s forwards; }
+
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes levelup-scale { 0% { transform: scale(0.5); opacity: 0; } 15% { transform: scale(1.2); opacity: 1; } 30% { transform: scale(1); opacity: 1; } 80% { transform: scale(1); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+    @keyframes toast-slide { 0% { top: 0px; opacity: 0; } 10% { top: 80px; opacity: 1; } 90% { top: 80px; opacity: 1; } 100% { top: 0px; opacity: 0; } }
+
+    /* Ads & Google Play */
+    .ad-banner { height: 50px; background: #E0E0E0; color: #888; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; border-top: 1px solid #ccc; z-index: 40; }
+    .interstitial-ad { position: absolute; inset: 0; background: rgba(0,0,0,0.95); z-index: 500; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; }
+    .interstitial-ad-content { background: #333; color: #fff; width: 90%; height: 60%; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 12px; font-size: 20px; font-weight: bold; border: 2px solid #555; }
+    .ad-close-header { position: absolute; top: 20px; right: 20px; color: white; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+    .ad-close-btn { background: rgba(255,255,255,0.2); border: 2px solid white; color: white; width: 36px; height: 36px; border-radius: 50%; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; }
+    
+    .gplay-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); z-index: 600; display: flex; justify-content: center; align-items: flex-end; animation: fade-in 0.2s; }
+    .gplay-modal { background: white; width: 100%; max-width: 414px; border-top-left-radius: 16px; border-top-right-radius: 16px; padding: 0; display: flex; flex-direction: column; animation: slide-up 0.3s; }
+    .gplay-header { display: flex; align-items: center; padding: 16px; border-bottom: 1px solid #eee; }
+    .gplay-logo { width: 24px; height: 24px; background: #0F9D58; border-radius: 4px; margin-right: 12px; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; font-size: 14px; }
+    .gplay-title { font-size: 14px; color: #555; flex: 1; }
+    .gplay-content { padding: 20px; color: #333; }
+    .gplay-app-name { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+    .gplay-plan-name { font-size: 14px; color: #0F9D58; font-weight: bold; margin-bottom: 16px; }
+    .gplay-price { font-size: 14px; color: #333; margin-bottom: 24px; display: flex; justify-content: space-between; border-top: 1px solid #eee; padding-top: 16px; }
+    .gplay-btn { width: 100%; padding: 14px; background: #0F9D58; color: white; border: none; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; }
+    .gplay-btn:disabled { background: #888; cursor: not-allowed; }
+    @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+    /* Benefit Screen */
+    .benefit-overlay { position: absolute; inset: 0; background: rgba(10, 25, 47, 0.98); z-index: 550; display: flex; flex-direction: column; align-items: center; overflow-y: auto; padding: 50px 20px 30px; animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    .benefit-close { position: absolute; top: 15px; right: 20px; color: rgba(255,255,255,0.5); font-size: 32px; cursor: pointer; font-weight: 300; line-height: 1; }
+    .benefit-header { text-align: center; margin-bottom: 30px; }
+    .benefit-title { color: var(--accent-gold); font-size: 26px; font-weight: bold; margin-bottom: 8px; letter-spacing: 1px; text-shadow: 0 0 15px rgba(212, 175, 55, 0.3); }
+    .benefit-subtitle { color: white; font-size: 13px; opacity: 0.7; }
+    .benefit-list { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 16px; margin-bottom: 40px; }
+    .benefit-item { display: flex; align-items: flex-start; gap: 16px; background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 16px; border: 1px solid rgba(212, 175, 55, 0.3); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .benefit-icon { font-size: 28px; line-height: 1; text-shadow: 0 0 10px rgba(212, 175, 55, 0.5); }
+    .benefit-text h4 { color: var(--accent-gold-light); font-size: 16px; margin-bottom: 6px; font-weight: bold; }
+    .benefit-text p { color: #ccc; font-size: 13px; line-height: 1.5; }
+    .benefit-cta-btn { width: 100%; max-width: 400px; padding: 20px; background: linear-gradient(135deg, var(--accent-gold), #B8860B); border: none; border-radius: 12px; color: var(--primary-navy); font-weight: bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 25px rgba(212, 175, 55, 0.4); transition: transform 0.1s; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .benefit-cta-btn:active { transform: scale(0.97); }
+    .benefit-cta-sub { font-size: 12px; opacity: 0.8; font-weight: normal; }
+    .terms-checkbox-container {
+      display: flex; align-items: flex-start; margin: 15px 0; font-size: 11px; color: #555; text-align: left; line-height: 1.4;
+    }
+    .terms-checkbox-container input[type="checkbox"] { margin-top: 2px; margin-right: 8px; }
+    .terms-link { color: var(--primary-navy); text-decoration: underline; cursor: pointer; }
+    .terms-modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6);
+      display: flex; justify-content: center; align-items: center; z-index: 10000; padding: 20px;
+    }
+    .terms-modal-content {
+      background: white; border-radius: 12px; padding: 20px; width: 100%; max-width: 500px;
+      max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .terms-modal-header { font-size: 18px; font-weight: bold; color: var(--primary-navy); margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    .terms-modal-body { flex: 1; overflow-y: auto; font-size: 13px; color: #333; line-height: 1.6; }
+    .terms-modal-body h3 { font-size: 14px; margin-top: 15px; margin-bottom: 5px; color: var(--accent-gold); }
+    .terms-modal-footer { margin-top: 15px; text-align: center; }
+    .auth-btn:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; transform: none; }
+  </style>
+</head>
+<body>
+  <div id="app" class="app-container" v-cloak>
+    
+    <!-- LEVEL UP OVERLAY -->
+    <div v-if="showLevelUp" class="levelup-overlay">
+      <div class="levelup-text">LEVEL UP!</div>
+      <div class="levelup-sub">{{ levelUpMessage }}</div>
+    </div>
+
+    <!-- BADGE TOAST -->
+    <div v-if="showBadgeToast" class="badge-toast">
+      🏆 バッジ解放: {{ badgeToastMessage }}
+    </div>
+
+    <!-- INTERSTITIAL AD -->
+    <div v-if="showInterstitialAd" class="interstitial-ad">
+      <div class="ad-close-header">
+        <span v-if="adCountdown > 0">{{ adCountdown }}秒後に閉じられます</span>
+        <button v-else class="ad-close-btn" @click="closeInterstitialAd">×</button>
+      </div>
+      <div class="interstitial-ad-content">
+        <div>[AD] 全画面スポンサー広告</div>
+        <div style="font-size:12px; font-weight:normal; margin-top:10px; color:#aaa;">(プレミアムプランで非表示になります)</div>
+      </div>
+    </div>
+
+    <!-- PREMIUM BENEFIT SCREEN -->
+    <div v-if="showBenefitScreen" class="benefit-overlay">
+      <div class="benefit-close" @click="showBenefitScreen = false">×</div>
+      
+      <div class="benefit-header">
+        <h2 class="benefit-title">PREMIUM PLAN</h2>
+        <p class="benefit-subtitle">士業の学習を、最上級の環境で。</p>
+      </div>
+      
+      <div class="benefit-list">
+        <div class="benefit-item">
+          <div class="benefit-icon">📈</div>
+          <div class="benefit-text">
+            <h4>獲得経験値が常時3倍</h4>
+            <p>クイズ正解や模試での獲得EXPが常に3倍。合格への階段を最短ルートで駆け上がることができます。</p>
+          </div>
+        </div>
+        <div class="benefit-item">
+          <div class="benefit-icon">✨</div>
+          <div class="benefit-text">
+            <h4>完全広告除去</h4>
+            <p>バナー広告・全画面広告を完全非表示。集中力を一切途切れさせない純粋な学習空間を提供します。</p>
+          </div>
+        </div>
+        <div class="benefit-item">
+          <div class="benefit-icon">🤝</div>
+          <div class="benefit-text">
+            <h4>フレンド枠100人解放</h4>
+            <p>初期15人から100人まで拡張。全国の意識高いライバルと繋がりモチベーションを保ちます。</p>
+          </div>
+        </div>
+        <div class="benefit-item">
+          <div class="benefit-icon">💬</div>
+          <div class="benefit-text">
+            <h4>チャット送信無制限</h4>
+            <p>1日の発言回数制限（10回）が撤廃。ファームや自習室で思う存分議論し、学習効果を高められます。</p>
+          </div>
+        </div>
+        <div class="benefit-item">
+          <div class="benefit-icon">📚</div>
+          <div class="benefit-text">
+            <h4>模試アーカイブ受講解放</h4>
+            <p>過去に行われた21時一斉模試にいつでも挑戦可能。自分のペースで実力試しができます。</p>
+          </div>
+        </div>
+      </div>
+      
+      <button class="benefit-cta-btn" @click="showGPlayModal = true; showBenefitScreen = false;">
+        <span>プレミアムに加入する</span>
+        <span class="benefit-cta-sub">月額 380円 / いつでもキャンセル可能</span>
+      </button>
+    </div>
+
+    <!-- GOOGLE PLAY MODAL -->
+    <div v-if="showGPlayModal" class="gplay-overlay">
+      <div class="gplay-modal">
+        <div class="gplay-header">
+          <div class="gplay-logo">▶</div>
+          <div class="gplay-title">Google Play</div>
+          <button style="background:none; border:none; font-size:20px; color:#888; cursor:pointer;" @click="showGPlayModal = false">×</button>
+        </div>
+        <div class="gplay-content">
+          <div class="gplay-app-name">士業向 コミュニティ学習アプリ</div>
+          <div class="gplay-plan-name">プレミアムプラン（定期購入）</div>
+          <div style="font-size:12px; color:#888; margin-bottom:16px;">
+            特典: 獲得EXP3倍 / フレンド枠100名 / 全機能無制限 / 広告非表示
+          </div>
+          <div class="gplay-price">
+            <span>月額</span>
+            <span style="font-weight:bold;">¥380</span>
+          </div>
+          <button class="gplay-btn" @click="doGooglePlayPurchase" :disabled="isProcessingPayment">
+            <span class="spinner" style="width:16px;height:16px;border-width:2px;margin:0;border-top-color:white;" v-if="isProcessingPayment"></span>
+            {{ isProcessingPayment ? '処理中...' : '定期購入' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BADGE SELECTION MODAL -->
+    <div v-if="showBadgeModal" class="badge-modal-overlay">
+      <div class="badge-modal">
+        <div class="badge-modal-header">
+          <h3>🎖️ バッジを変更する</h3>
+        </div>
+        <div class="badge-grid">
+          <div class="badge-grid-item" v-for="b in ALL_BADGES" :key="b.id" :class="{active: activeBadge === b.id, locked: !unlockedBadges.includes(b.id)}" @click="equipBadge(b.id)">
+            <div class="badge-grid-icon">{{ !unlockedBadges.includes(b.id) ? '🔒' : b.icon }}</div>
+            <div class="badge-grid-name">{{ b.name }}</div>
+          </div>
+        </div>
+        <button class="badge-modal-close" @click="showBadgeModal = false">閉じる</button>
+      </div>
+    </div>
+
+    <!-- FIRM MEMBER PROFILE MODAL -->
+    <div v-if="showMemberProfileModal" class="badge-modal-overlay">
+      <div class="badge-modal" style="align-items:center;">
+        <div class="profile-avatar" style="margin-bottom:10px;">👤</div>
+        <div class="profile-badge-tag" style="position:static; transform:none; margin-bottom:15px; font-size:13px;">{{ activeFirmMember?.badge }}</div>
+        <div style="font-size:22px; font-weight:bold; color:var(--primary-navy); margin-bottom:5px;">{{ activeFirmMember?.name }}</div>
+        <div style="font-size:14px; color:var(--accent-gold); font-weight:bold; margin-bottom:20px;">Lv.{{ activeFirmMember?.level }} ・ {{ activeFirmMember?.title }}</div>
+        
+        <div style="background:#f8f9fa; padding:15px; border-radius:10px; font-size:14px; color:#555; width:100%; text-align:left; margin-bottom:20px; box-shadow:inset 0 2px 5px rgba(0,0,0,0.05);">
+          {{ activeFirmMember?.intro }}
+        </div>
+        
+        <button class="primary-btn" @click="sendFriendRequest(activeFirmMember)" :disabled="isAlreadyFriend(activeFirmMember?.id) || requestedFriends.includes(activeFirmMember?.id)" :style="isAlreadyFriend(activeFirmMember?.id) || requestedFriends.includes(activeFirmMember?.id) ? 'background:#ccc; color:#fff;' : 'background:var(--accent-gold); color:var(--primary-navy);'">
+          {{ isAlreadyFriend(activeFirmMember?.id) ? 'フレンド登録済み' : (requestedFriends.includes(activeFirmMember?.id) ? '申請中' : 'フレンド申請する') }}
+        </button>
+        <button v-if="isFirmOwner && activeFirmMember?.farmId === myFarmId" class="primary-btn" @click="transferOwnership(activeFirmMember)" style="background:#d35400; color:white; margin-top:10px;">👑 設立者権限を移譲する</button>
+        <button class="badge-modal-close" @click="showMemberProfileModal = false; activeFirmMember = null" style="background:var(--text-sub); margin-top:10px;">閉じる</button>
+      </div>
+    </div>
+
+    <transition name="fade" mode="out-in">
+      
+      <!-- ====================== -->
+      <!-- AUTH: LOGIN            -->
+      <!-- ====================== -->
+      <div v-if="authScreen === 'login'" class="screen auth-screen" key="auth-login">
+        <div class="auth-card">
+          <h2>ログイン</h2>
+          <div v-if="loginError" class="auth-error">{{ loginError }}</div>
+          <input type="email" v-model="loginUsername" placeholder="メールアドレス" class="auth-input" @keyup.enter="doLogin">
+          <input type="password" v-model="loginPassword" placeholder="パスワード" class="auth-input" @keyup.enter="doLogin">
+          <button class="auth-btn" @click="doLogin">ログインして学習開始</button>
+          <span class="auth-link" @click="authScreen = 'register'">アカウントを新規作成する</span>
+        </div>
+      </div>
+
+      <!-- ====================== -->
+      <!-- AUTH: REGISTER         -->
+      <!-- ====================== -->
+      <div v-else-if="authScreen === 'register'" class="screen auth-screen" key="auth-register">
+        <div class="auth-card">
+          <h2>新規アカウント作成</h2>
+          <div v-if="regError" class="auth-error">{{ regError }}</div>
+          <input type="email" v-model="regUsername" placeholder="メールアドレス" class="auth-input">
+          <input type="password" v-model="regPassword" placeholder="パスワード" class="auth-input">
+          <textarea v-model="regIntro" placeholder="自己紹介コメント" class="auth-input" style="height:60px; resize:none;"></textarea>
+          
+          <div class="terms-checkbox-container">
+            <input type="checkbox" id="agreeTerms" v-model="agreedToTerms">
+            <label for="agreeTerms">
+              <span class="terms-link" @click.stop="showTermsModal = true">利用規約</span> と <span class="terms-link" @click.stop="showPrivacyModal = true">プライバシーポリシー</span> に同意する
+            </label>
+          </div>
+
+          <button class="auth-btn" :disabled="!agreedToTerms" @click="doRegister">登録して自動ログイン</button>
+          <span class="auth-link" @click="authScreen = 'login'">← ログイン画面へ戻る</span>
+        </div>
+      </div>
+
+      <!-- ====================== -->
+      <!-- MODE SELECTION         -->
+      <!-- ====================== -->
+      <div v-else-if="authScreen === 'app' && activeMode === null" class="screen mode-select-screen" key="mode-select">
+        <h1 class="mode-select-title">資格を選択</h1>
+        
+        <div class="mode-card active" @click="selectMode('shindanshi')">
+          <div class="mode-icon">💼</div>
+          <div class="mode-name">中小企業診断士</div>
+          <div class="mode-desc">全7科目・一問一答道場。合格への最短ルートを駆け上がれ。</div>
+        </div>
+        
+        <div class="mode-card disabled">
+          <div class="mode-badge-cs">Coming Soon</div>
+          <div class="mode-icon">⚖️</div>
+          <div class="mode-name">行政書士</div>
+          <div class="mode-desc">法律の専門家を目指す道。鋭意開発中。</div>
+        </div>
+        
+        <div class="mode-card disabled">
+          <div class="mode-badge-cs">Coming Soon</div>
+          <div class="mode-icon">🏠</div>
+          <div class="mode-name">宅建士</div>
+          <div class="mode-desc">不動産取引のスペシャリストへ。鋭意開発中。</div>
+        </div>
+      </div>
+
+      <!-- ====================== -->
+      <!-- APP MAIN CONTAINER     -->
+      <!-- ====================== -->
+      <div v-else-if="authScreen === 'app' && activeMode !== null" class="app-main" key="app-main">
+        <!-- 開発用パネル -->
+        <div class="dev-panel">
+          <div class="dev-panel-title" style="display:flex; justify-content:space-between;">
+            <span>⚙️ 開発ツール | 👤 {{ currentUser }}</span>
+            <span style="color:var(--danger-color); cursor:pointer;" @click="resetAllData">全DB消去</span>
+          </div>
+          <div class="dev-controls">
+            <button class="dev-btn" @click="activeMode = null; activeTab = 'home'" style="background: #555;">🔙 モード選択に戻る</button>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="isPremium">
+              <span class="toggle-slider"></span>
+              <span class="toggle-label" style="margin-right:8px;">{{ isPremium ? 'PREMIUM (EXP3倍)' : '無料' }}</span>
+            </label>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="isFarmMember">
+              <span class="toggle-slider"></span>
+              <span class="toggle-label" style="margin-right:8px;">{{ isFarmMember ? 'ファーム: 所属' : 'ファーム: 未所属' }}</span>
+            </label>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="isFirmOwner">
+              <span class="toggle-slider"></span>
+              <span class="toggle-label" style="margin-right:8px;">{{ isFirmOwner ? 'オーナー: 有' : 'オーナー: 無' }}</span>
+            </label>
+            <button class="dev-btn" @click="myFarmId = myFarmId === 'other_farm' ? 'f_123' : 'other_farm'" style="background: #8E44AD;">自分を別ファームの所属にする</button>
+            <button class="dev-btn" @click="startMockExam(10)" style="background: #C62828;">🔥強制模試(10秒)</button>
+            <button class="dev-btn" @click="addExp(1000000)">EXP+100万</button>
+            <button class="dev-btn" @click="unlockedBadges = ALL_BADGES.map(b=>b.id)" style="background: #E65100;">全バッジ解放</button>
+            <button class="dev-btn" @click="addDummyFriendsMode(5)" style="background: #0F9D58;">ダミーフレンド+5</button>
+            <button class="dev-btn" @click="addDummyFirmMembers(3)" style="background: #0F9D58;">ダミーファームメンバー+3</button>
+            <button class="dev-btn" @click="setAllTo2" style="background: #E65100;">全問2回正解(テスト用)</button>
+            <button class="dev-btn" @click="chatCount = 0" style="background: #C62828;">発言回数リセット</button>
+          </div>
+        </div>
+
+        <!-- ローディングオーバーレイ -->
+        <div v-if="isLoading" class="loading-overlay">
+          <div class="spinner"></div>
+          <p>通信中...</p>
+        </div>
+
+        <transition name="fade" mode="out-in">
+          
+          <!-- TAB: HOME (Dashboard) -->
+          <div v-if="activeTab === 'home'" class="screen dashboard-screen" key="tab-home">
+            <div class="exam-banner" :class="{live: isExamLive}" v-if="!isExamLive">
+              📢 21時 一斉模試まで あと {{ examCountdownString }}
+            </div>
+            <div class="exam-banner live" v-else @click="startMockExam(600)" style="cursor:pointer;">
+              📢 【現在開催中！】一斉模試に参加する (タップ)
+            </div>
+
+            <div class="dashboard-header">
+              <h1>一問一答 道場</h1>
+              <p style="color:var(--accent-gold-light); font-size:14px;">レベル＆称号システム対応</p>
+            </div>
+            
+            <div class="status-card">
+              <div class="status-header">
+                <span class="status-label">現在の称号</span>
+                <span class="highlight-gold">[{{ activeBadge }}] {{ currentTitle }}</span>
+              </div>
+              <div class="status-row">
+                <span class="status-label">Lv.{{ currentLevel }}</span>
+                <span class="status-value">{{ totalExp.toLocaleString() }} EXP</span>
+              </div>
+              <div class="progress-bar-container">
+                <div class="progress-bar-fill" :style="{ width: expProgressPercent + '%' }"></div>
+              </div>
+              <div style="text-align:right; font-size:10px; color:#aaa; margin-top:4px;">Next Lv: {{ nextLevelExp.toLocaleString() }} EXP</div>
+            </div>
+
+            <div class="subject-section">
+              <div class="settings-panel">
+                <div class="settings-row">
+                  <span class="settings-label">🔀 問題をランダムに出題する</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" v-model="quizSettings.isRandom">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="settings-row">
+                  <span class="settings-label">✅ 3回正解（マスター済）を除外</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" v-model="quizSettings.excludeMastered">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+              
+              <h3 style="margin-bottom: 10px;">科目と問題ブロックを選択</h3>
+              <div class="subject-list">
+                <div v-for="subj in SUBJECTS" :key="subj.id">
+                  <button class="subject-block-btn" :class="{ open: expandedSubject === subj.id }" @click="expandedSubject = expandedSubject === subj.id ? null : subj.id">
+                    <span>{{ subj.name }}</span>
+                    <span>{{ expandedSubject === subj.id ? '▲' : '▼' }}</span>
+                  </button>
+                  <div class="block-grid" v-if="expandedSubject === subj.id">
+                    <button v-for="b in 10" :key="b" class="block-item-btn" @click="goToStudyRoomLobby(subj.id, b)">
+                      第 {{ (b - 1) * 100 + 1 }} 〜 {{ b * 100 }} 問
+                      <span v-if="masteredBlocks[`${subj.id}_${b}`]" style="color:var(--accent-gold); font-size:10px; font-weight:bold; margin-left:4px;">🔥MASTERED</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div style="margin-top: 30px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; border: 1px dashed rgba(255,255,255,0.3);">
+                <p style="font-size: 12px; color: #aaa; margin-bottom: 8px;">※ローカル起動時はこちらから手動でJSONを読込</p>
+                <input type="file" @change="handleFileUpload" accept=".json" style="color: white; font-size: 14px;">
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: EXAM (21時模試) -->
+          <div v-else-if="activeTab === 'exam'" class="screen quiz-screen" key="tab-exam">
+            <header class="header" style="padding: 10px 20px; background: #112240; color: white;">
+              <h2 style="color:var(--accent-gold); font-size:14px;">🔥 21時一斉模試 タイムアタック</h2>
+              <div style="font-size: 16px; font-weight: bold; font-family: monospace;">残り {{ formattedExamTime }}</div>
+            </header>
+            <div class="exam-timer-bar" :style="{ width: (examTimeLeft / examTotalTime * 100) + '%' }"></div>
+            
+            <main class="main-content" style="background: #0A192F;">
+              <div v-if="!isExamFinished" style="flex:1; display:flex; flex-direction:column;">
+                <div style="text-align: center; color: white; margin-bottom: 10px; font-size: 12px;">問題 {{ examCurrentIndex + 1 }} / 100</div>
+                <div class="card-stack-container">
+                    <div class="quiz-card active-card">
+                      <div class="card-header" style="background: var(--accent-gold); color: var(--primary-navy);">
+                        <span class="card-meta" style="color: var(--primary-navy);">第{{ examCurrentQuestion.question_no || 'X' }}問</span>
+                        <span style="font-size:10px; font-weight:bold;">{{ examCurrentQuestion.topic }}</span>
+                      </div>
+                      <div class="question-content">
+                        <p class="q-statement">{{ examCurrentQuestion.statement }}</p>
+                      </div>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                  <button class="btn-cross" @click="handleExamAnswer(false)">×</button>
+                  <button class="btn-circle" @click="handleExamAnswer(true)">〇</button>
+                </div>
+              </div>
+              <div v-else class="result-section">
+                <div class="result-card" style="border: 4px solid var(--accent-gold);">
+                  <h2 style="color:var(--primary-navy); margin-bottom:10px;">模試リザルト</h2>
+                  <div style="font-size: 16px; margin-bottom: 10px;">正答数: <span style="font-size:32px; color:var(--accent-gold); font-weight:bold;">{{ examCorrectCount }}</span> / 100</div>
+                  <div style="color: var(--success-color); font-weight: bold; margin-bottom: 20px;">+{{ isPremium ? examCorrectCount * 30 : examCorrectCount * 10 }} EXP獲得！</div>
+                  
+                  <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; text-align: left;">
+                    <p>🏆 <strong>全国順位 (推定):</strong> {{ Math.floor(Math.random() * 500) + 1 }}位 / 4,200人</p>
+                    <p v-if="isFarmMember">🏢 <strong>ファーム平均点:</strong> {{ Math.floor(Math.random() * 20) + 60 }}点</p>
+                  </div>
+                  
+                  <button v-if="isFarmMember" class="primary-btn" @click="triggerInterstitial(returnToFirmFromExam)">ファーム会議室へ進む</button>
+                  <button v-else class="primary-btn" @click="triggerInterstitial(() => { activeTab = 'home' })">ホームへ戻る</button>
+                </div>
+              </div>
+            </main>
+          </div>
+
+          <!-- TAB: STUDY (自習室) -->
+          <div v-else-if="activeTab === 'study'" class="screen" key="tab-study">
+            <div v-if="studyRoute === 'rooms'" class="study-rooms" style="display:flex; flex-direction:column; height:100%;">
+              <header class="header" style="margin: -24px -24px 0px;">
+                <button class="back-btn" @click="activeTab = 'home'">← 戻る</button>
+                <h2>自習室ロビー</h2>
+              </header>
+              <div class="lobby-tabs">
+                <div class="lobby-tab" :class="{active: lobbyActiveTab === 'silent'}" @click="lobbyActiveTab = 'silent'">サイレント (10室)</div>
+                <div class="lobby-tab" :class="{active: lobbyActiveTab === 'chat'}" @click="lobbyActiveTab = 'chat'">チャット推奨 (20室)</div>
+              </div>
+              <div style="flex:1; overflow-y:auto;">
+                <div class="room-grid">
+                  <div class="room-card-new" v-for="room in STUDY_ROOMS.filter(r => r.type === lobbyActiveTab)" :key="room.id" @click="enterRoomNew(room)">
+                    <div class="room-card-title">{{ room.name }}</div>
+                    <div class="room-card-meta">
+                      <span class="room-card-count">{{ room.count }} / {{ room.capacity }}人</span>
+                      <span class="room-status-badge" :class="getRoomStatusClass(room)">{{ getRoomStatusText(room) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div v-else-if="studyRoute === 'quiz'" class="quiz-screen screen">
+              <header class="header" style="padding: 10px 20px;">
+                <button class="back-btn" @click="triggerInterstitial(() => { studyRoute = 'rooms'; if(activeRoom) activeRoom.count--; })" style="font-size:12px;">← 中断</button>
+                <h2 style="font-size:14px;">{{ activeRoom?.name }}</h2>
+                <div style="font-size: 12px; font-weight: bold; color: var(--text-sub);">{{ currentQuestionIndex + 1 }} / {{ quizQueue.length }}</div>
+              </header>
+              <div class="quiz-split">
+                <main class="main-content">
+                  <div v-if="!isFinished" style="flex:1; display:flex; flex-direction:column;">
+                    <div style="font-size:11px; color:#888; text-align:center; margin-bottom:5px;">現在 {{ dailyCombo }} コンボ継続中！</div>
+                    <div class="card-stack-container">
+                        <div class="quiz-card active-card">
+                          <div class="card-header">
+                            <span class="card-meta">第{{ currentQuestion.question_no || 'X' }}問</span>
+                            <span style="font-size:10px;">{{ currentQuestion.topic }}</span>
+                          </div>
+                          <div v-if="!showFeedback" class="question-content">
+                            <p class="q-statement">{{ currentQuestion.statement }}</p>
+                          </div>
+                          <div v-else class="feedback-content">
+                            <div class="feedback-result" :class="isCorrect ? 'correct' : 'incorrect'">{{ isCorrect ? '正解！' : '不正解' }}</div>
+                            <div class="normal-exp" v-if="isCorrect">+{{ isPremium ? 30 : 10 }} EXP</div>
+                            <div class="explanation-box"><p class="explanation-text">{{ currentQuestion.explanation }}</p></div>
+                            <button class="next-btn" @click="nextQuestion">次へ</button>
+                          </div>
+                        </div>
+                    </div>
+                    <div class="action-buttons" v-if="!showFeedback">
+                      <button class="btn-cross" @click="handleAnswer(false)">×</button>
+                      <button class="btn-circle" @click="handleAnswer(true)">〇</button>
+                    </div>
+                  </div>
+                  <div v-else class="result-section">
+                    <div class="result-card">
+                      <h2 style="color:var(--primary-navy); margin-bottom:16px;">セッション完了</h2>
+                      <div style="font-size: 16px; margin-bottom: 20px;">正解数: <span style="font-size:24px; color:var(--accent-gold); font-weight:bold;">{{ correctCount }}</span> / {{ quizQueue.length }}</div>
+                      <button class="primary-btn" @click="triggerInterstitial(() => { studyRoute = 'rooms'; activeRoom.count--; })">ロビーへ戻る</button>
+                    </div>
+                  </div>
+                </main>
+                <div class="study-timeline-area">
+                  <div class="timeline-header">
+                    <span>学習ログ {{ activeRoom?.type === 'silent' ? '(チャット禁止)' : '' }}</span>
+                    <span style="font-weight:normal; font-size:10px;">{{ activeRoom?.count || 0 }}人入室中</span>
+                  </div>
+                  <div class="timeline-logs" id="studyLogs">
+                    <div class="log-item" v-for="(log, i) in studyLogs" :key="i">
+                      <span class="log-time">{{ log.time }}</span>
+                      <template v-if="log.user">
+                        <strong @click="openStudyUserProfile(log.user)" style="cursor:pointer; text-decoration:underline; color:var(--primary-navy);">{{ log.user.name }}</strong>
+                        <span v-if="log.type === 'silent'"> {{ log.action }}</span>
+                        <span v-else>: {{ log.message }}</span>
+                      </template>
+                      <template v-else>
+                        <span v-html="log.text"></span>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="chat-input-area" v-if="activeRoom?.type !== 'silent'">
+                    <input type="text" v-model="studyChatInput" placeholder="メッセージを送信" :disabled="!canSendChat" @keyup.enter="sendStudyChat">
+                    <button @click="sendStudyChat" :disabled="!canSendChat || !studyChatInput.trim()">送信</button>
+                  </div>
+                  <div v-else style="padding: 10px; text-align: center; font-size: 11px; color: #888; background: #eee;">
+                    サイレント自習室のためチャットは無効化されています。
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: FRIEND (フレンド) -->
+          <div v-else-if="activeTab === 'friend'" class="screen" key="tab-friend">
+            <div v-if="friendRoute === 'list'" class="friend-list-view">
+              <div class="friend-list-header">
+                <h2>フレンド ({{ friendsList.length }}人)</h2>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                  <input type="text" v-model="friendSearch" placeholder="名前でフレンドを検索..." class="friend-search" style="flex: 1; margin: 0;">
+                  <button class="primary-btn" @click="friendRoute = 'search'" style="width: auto; padding: 0 15px; margin: 0;">ユーザー検索 🔍</button>
+                </div>
+              </div>
+              <div v-if="filteredFriends.length === 0" style="text-align: center; color: #888; margin-top: 40px;">
+                フレンドが見つかりません
+              </div>
+              <div class="friend-list">
+                <div class="friend-item" v-for="f in filteredFriends" :key="f.id" @click="openDirectChat(f)" style="position:relative; padding-right: 60px;">
+                  <div class="friend-icon">{{ f.icon }}</div>
+                  <div class="friend-info">
+                    <div class="friend-name"><span style="color:var(--accent-gold); font-size:12px; margin-right:4px;">[{{ f.badge || '🔰 新人' }}]</span>{{ f.name }}</div>
+                    <div class="friend-level">Lv.{{ f.level }} ・ {{ f.title || 'アソシエイト（見習い）' }}</div>
+                  </div>
+                  <div style="display: flex; gap: 15px; align-items: center; position: absolute; right: 15px; top: 50%; transform: translateY(-50%);">
+                    <div style="color: var(--accent-gold); font-size: 20px;">💬</div>
+                    <button @click.stop="removeFriend(f)" style="background: none; border: none; color: #C62828; font-size: 16px; cursor: pointer; padding: 4px; display:flex; align-items:center; justify-content:center;">✖</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div v-else-if="friendRoute === 'search'" class="friend-list-view">
+              <div class="friend-list-header">
+                <button class="back-btn" @click="friendRoute = 'list'" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
+                <h2>ユーザーを探す</h2>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                  <input type="text" v-model="userSearchQuery" placeholder="ユーザー名で検索..." class="friend-search" style="flex: 1; margin: 0;" @keyup.enter="searchUsers">
+                  <button class="primary-btn" @click="searchUsers" style="width: auto; padding: 0 15px; margin: 0;">検索</button>
+                </div>
+              </div>
+
+              <div v-if="isSearching" style="text-align: center; color: #888; margin-top: 40px;">
+                検索中...
+              </div>
+              <div v-else-if="searchedUsers.length === 0 && hasSearched" style="text-align: center; color: #888; margin-top: 40px;">
+                該当するユーザーが見つかりません
+              </div>
+
+              <div v-else class="friend-list" style="margin-top: 15px;">
+                <div class="friend-item" v-for="user in searchedUsers" :key="user.id">
+                  <div class="friend-icon">👤</div>
+                  <div class="friend-info">
+                    <div class="friend-name">
+                      <span style="color:var(--accent-gold); font-size:12px; margin-right:4px;">[{{ getDisplayBadge(user.unlocked_badges) }}]</span>
+                      {{ user.user_name }}
+                    </div>
+                    <div class="friend-level">Lv.{{ user.level }} ・ {{ user.title || 'アソシエイト' }}</div>
+                  </div>
+                  <button class="primary-btn" @click="sendFriendRequestAPI(user)" style="padding: 6px 12px; font-size: 11px; width: auto;">申請</button>
+                </div>
+              </div>
+            </div>
+            
+            <div v-else-if="friendRoute === 'chat'" class="friend-chat-screen">
+              <div class="friend-chat-header">
+                <button class="back-btn" @click="friendRoute = 'list'" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
+                <div class="friend-icon" style="font-size: 24px; margin-right: 10px; margin-bottom: 0;">{{ activeFriend?.icon }}</div>
+                <div>
+                  <div class="friend-name" style="margin-bottom:0;">{{ activeFriend?.name }}</div>
+                </div>
+              </div>
+              <div class="firm-chat-timeline" id="directChatArea" style="flex:1;">
+                <div v-if="!(directChats[activeFriend?.id]?.length)" style="text-align: center; color: #888; margin-top: 20px;">
+                  まだチャット履歴がありません。<br>挨拶してみましょう！
+                </div>
+                <div class="firm-msg" v-for="(m, i) in (directChats[activeFriend?.id] || [])" :key="i" :class="{'my-msg': m.sender === 'me', 'system-msg': false}">
+                  <div class="firm-msg-text">{{ m.text }}</div>
+                  <div style="font-size: 9px; color: #888; margin-top: 4px; text-align: right;">{{ m.time }}</div>
+                </div>
+              </div>
+              <div class="chat-input-area" style="margin-top: 15px;">
+                <input type="text" v-model="directChatInput" placeholder="メッセージを送信..." :disabled="!canSendChat" @keyup.enter="sendDirectChat" maxlength="500">
+                <button @click="sendDirectChat" :disabled="!canSendChat || !directChatInput.trim()">送信</button>
+              </div>
+              <div style="text-align: right; font-size: 10px; color: #888; margin-top: 4px; padding-right: 70px;">{{ directChatInput.length }} / 500</div>
+            </div>
+          </div>
+
+          <!-- TAB: FIRM (ファーム) -->
+          <div v-else-if="activeTab === 'firm'" class="screen" key="tab-firm">
+            <div v-if="!isFarmMember" style="display:flex; flex-direction:column; height:100%;">
+              <!-- 未所属向けロビー -->
+              <div v-if="firmJoinRoute === 'lobby'" class="firm-lobby" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 20px;">
+                <div style="font-size: 48px; margin-bottom: 10px;">🏛️</div>
+                <h2 style="color:var(--primary-navy); margin-bottom:16px;">ファーム未所属</h2>
+                <p style="font-size:14px; margin-bottom:30px; color:var(--text-sub); text-align:center; line-height:1.6;">
+                  ファームに所属すると、仲間と作戦会議をしたり、模試の平均点を競い合うことができます。<br>同じ志を持つ仲間を見つけましょう！
+                </p>
+                <button class="primary-btn" @click="firmJoinRoute = 'search'" style="margin-bottom: 15px; width: 100%;">🔍 ファームを探す・加入する</button>
+                <button class="primary-btn" @click="firmJoinRoute = 'create'" style="background: white; color: var(--primary-navy); border: 2px solid var(--primary-navy); width: 100%;">➕ ファームを新しく設立する</button>
+              </div>
+
+              <!-- ファーム検索・加入画面 -->
+              <div v-else-if="firmJoinRoute === 'search'" class="firm-search-screen" style="flex:1; display:flex; flex-direction:column;">
+                <header class="header" style="display:flex; align-items:center;">
+                  <button class="back-btn" @click="firmJoinRoute = 'lobby'" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
+                  <h2>ファームを探す</h2>
+                </header>
+                <div style="padding: 15px; flex: 1; overflow-y: auto;">
+                  <input type="text" v-model="firmSearchQuery" placeholder="ファーム名・キーワードで検索..." class="auth-input" style="margin-bottom: 15px;">
+                  <div class="friend-list">
+                    <div class="friend-item" v-for="f in filteredDummyFirms" :key="f.id" style="align-items:flex-start;">
+                      <div class="friend-icon" style="font-size: 24px; margin-right: 10px;">🏢</div>
+                      <div class="friend-info" style="flex: 1;">
+                        <div class="friend-name" style="font-size: 14px; margin-bottom: 4px; color: var(--primary-navy);">{{ f.name }} <span style="font-size:11px; color:#888; font-weight:normal;">({{ f.members }}/10人)</span></div>
+                        <div class="friend-level" style="color: #666; font-size: 11px; line-height: 1.4;">{{ f.intro }}</div>
+                      </div>
+                      <button class="primary-btn" @click="joinFirm(f)" style="padding: 6px 12px; font-size: 11px; width: auto;">加入</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ファーム設立画面 -->
+              <div v-else-if="firmJoinRoute === 'create'" class="firm-create-screen" style="flex:1; display:flex; flex-direction:column;">
+                <header class="header" style="display:flex; align-items:center;">
+                  <button class="back-btn" @click="firmJoinRoute = 'lobby'" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
+                  <h2>ファーム設立</h2>
+                </header>
+                <div style="padding: 20px; flex: 1; overflow-y: auto;">
+                  <div style="margin-bottom: 20px;">
+                    <label style="font-size:12px; font-weight:bold; color:var(--primary-navy); margin-bottom:5px; display:block;">ファーム名称</label>
+                    <input type="text" v-model="newFirmName" placeholder="例: 朝活合格塾" class="auth-input">
+                  </div>
+                  <div style="margin-bottom: 25px;">
+                    <label style="font-size:12px; font-weight:bold; color:var(--primary-navy); margin-bottom:5px; display:block;">紹介文 / 方針</label>
+                    <textarea v-model="newFirmIntro" placeholder="例: 毎日コツコツ頑張る社会人のためのファームです。" class="auth-input" style="height: 100px; resize: none;"></textarea>
+                  </div>
+                  <button class="primary-btn" @click="createFirm" :disabled="!newFirmName.trim() || !newFirmIntro.trim()">この内容でファームを設立する</button>
+                </div>
+              </div>
+            </div>
+            
+            <div v-else-if="firmRoute === 'chat'" class="firm-chat-screen" style="display:flex; flex-direction:column; height:100%;">
+              <header class="header" style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="font-size: 16px;">マイファーム</h2>
+                <div style="display: flex; gap: 8px;">
+                  <button @click="leaveFirm" style="background:#C62828; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">🚪 脱退</button>
+                  <button class="member-list-btn" @click="firmRoute = 'members'" style="background:var(--accent-gold); color:var(--primary-navy); border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">👥 メンバー</button>
+                </div>
+              </header>
+              <div class="firm-chat-section" style="flex:1; display:flex; flex-direction:column;">
+                <div style="font-size:11px; color:#888; text-align:right; margin-bottom:5px;">本日の送信枠: {{ isPremium ? '無制限' : (10 - chatCount) + '/10' }}</div>
+                <div class="firm-chat-timeline" id="firmChatArea" style="flex:1;">
+                  <div class="firm-msg" v-for="(m, i) in firmChat" :key="i" :class="{'my-msg': m.isMe || m.sender.includes('あなた') || m.sender.includes(displayName), 'system-msg': m.sender === 'システム'}">
+                    <div class="firm-msg-sender" v-if="m.sender !== 'システム'">{{ m.sender }}</div>
+                    <div class="firm-msg-text">{{ m.text }}</div>
+                  </div>
+                </div>
+                <div class="chat-input-area">
+                  <input type="text" v-model="firmChatInput" placeholder="発言する..." :disabled="!canSendChat" @keyup.enter="sendFirmChat" maxlength="500">
+                  <button @click="sendFirmChat" :disabled="!canSendChat || !firmChatInput.trim()">送信</button>
+                </div>
+                <div style="text-align: right; font-size: 10px; color: #888; margin-top: 4px; padding-right: 70px;">{{ firmChatInput.length }} / 500</div>
+              </div>
+            </div>
+
+            <div v-else-if="firmRoute === 'members'" class="firm-members-screen">
+              <header class="header" style="display:flex; align-items:center;">
+                <button class="back-btn" @click="firmRoute = 'chat'" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
+                <h2>メンバー一覧 (10人)</h2>
+              </header>
+              <div style="padding:15px; overflow-y:auto; flex:1;">
+                <div class="friend-list">
+                  <div class="friend-item" v-for="m in firmMembers" :key="m.id" @click="openMemberProfile(m)">
+                    <div class="friend-icon">👤</div>
+                    <div class="friend-info">
+                      <div class="friend-name"><span style="color:var(--accent-gold); font-size:12px; margin-right:4px;">[{{ m.badge }}]</span>{{ m.name }}</div>
+                      <div class="friend-level">Lv.{{ m.level }} ・ {{ m.title }}</div>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <button v-if="isFirmOwner && m.farmId === myFarmId" @click.stop="kickFirmMember(m)" style="background:#C62828; color:white; border:none; padding:6px 10px; border-radius:8px; font-weight:bold; font-size:11px; cursor:pointer;">キック</button>
+                      <div style="color: var(--accent-gold); font-size: 14px; font-weight:bold;">プロフ</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: PROFILE (成績) -->
+          <div v-else-if="activeTab === 'profile'" class="screen" key="tab-profile">
+            <header class="header"><h2>プロフィール</h2></header>
+            
+            <div class="profile-content">
+              <div class="profile-scroll" style="padding: 0;">
+                <div class="profile-hero">
+                  <div class="profile-hero-content">
+                    <div style="position: relative; display: inline-block; margin-bottom: 15px;">
+                      <div class="profile-avatar">👤</div>
+                      <div class="profile-badge-tag">{{ activeBadge }}</div>
+                    </div>
+                    <div class="profile-name">
+                      {{ displayName }}
+                      <button @click="editDisplayName" style="font-size:16px; margin-left:8px; border:none; background:transparent; cursor:pointer;" title="名前を変更">✏️</button>
+                    </div>
+                    <div class="profile-title">{{ currentTitle }}</div>
+                    
+                    <div class="profile-level-info">
+                      <span class="profile-level-text">Lv.{{ currentLevel }}</span>
+                      <span class="profile-exp-text">{{ totalExp.toLocaleString() }} EXP</span>
+                    </div>
+                    <div class="profile-progress-bar-container">
+                      <div class="profile-progress-bar-fill" :style="{ width: expProgressPercent + '%' }"></div>
+                    </div>
+                    <div class="profile-next-exp">Next Lv: {{ nextLevelExp.toLocaleString() }} EXP</div>
+                    
+                    <button class="change-badge-btn" @click="showBadgeModal = true">バッジを変更する</button>
+                  </div>
+                </div>
+
+                <div style="padding: 20px;">
+                  <div style="margin-bottom: 20px; padding: 16px; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center; border: 2px solid var(--accent-gold);">
+                    <div v-if="isPremium" style="font-size: 16px; font-weight: bold; color: var(--accent-gold);">
+                      👑 プレミアム会員
+                    </div>
+                    <div v-else>
+                      <div style="font-size: 14px; font-weight: bold; color: var(--primary-navy); margin-bottom: 8px;">無料プラン</div>
+                      <button class="primary-btn" style="background: #0F9D58; color: white; padding: 12px;" @click="showBenefitScreen = true">
+                        プレミアムプランに加入
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="self-intro-box">
+                    <h3>📝 自己紹介 (最大200文字)</h3>
+                    <textarea v-model="selfIntro" placeholder="目標や学習スタイルを記入してください..."></textarea>
+                    <div style="text-align: right;"><button class="save-btn" @click="saveSelfIntro">保存する</button></div>
+                  </div>
+                  
+                  <button class="primary-btn" style="background: var(--text-sub); color: white;" @click="doLogout">ログアウト</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </transition>
+
+        <!-- Bottom Ad Banner -->
+        <div v-if="!isPremium" class="ad-banner">
+          [AD] ここにスポンサー広告が表示されます
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav" v-if="!(activeTab === 'study' && studyRoute === 'quiz') && activeTab !== 'exam'">
+          <button class="nav-item" :class="{active: activeTab === 'home'}" @click="activeTab = 'home'">
+            <div class="nav-icon">🏠</div><span>ホーム</span>
+          </button>
+          <button class="nav-item" :class="{active: activeTab === 'friend'}" @click="activeTab = 'friend'">
+            <div class="nav-icon">🤝</div><span>フレンド</span>
+          </button>
+          <button class="nav-item" :class="{active: activeTab === 'firm'}" @click="activeTab = 'firm'">
+            <div class="nav-icon">🏢</div><span>ファーム</span>
+          </button>
+          <button class="nav-item" :class="{active: activeTab === 'profile'}" @click="activeTab = 'profile'">
+            <div class="nav-icon">👤</div><span>プロフィール</span>
+          </button>
+        </nav>
+        
+        <!-- Paywall -->
+        <div class="paywall-overlay" v-if="paywallConfig.show">
+          <div class="paywall-box">
+            <div class="paywall-icon">🔒</div>
+            <h2>{{ paywallConfig.title }}</h2>
+            <p>{{ paywallConfig.message }}</p>
+            <button class="subscribe-btn" @click="showBenefitScreen = true; paywallConfig.show = false;">サブスクを登録する</button>
+            <button class="close-btn" @click="paywallConfig.show = false">閉じる</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================== -->
+      <!-- TERMS & PRIVACY MODALS -->
+      <!-- ====================== -->
+      <transition name="fade">
+        <div class="terms-modal-overlay" v-if="showTermsModal" @click.self="showTermsModal = false">
+          <div class="terms-modal-content">
+            <div class="terms-modal-header">利用規約</div>
+            <div class="terms-modal-body">
+              <h3>第1条（適用）</h3>
+              <p>本規約は、ユーザーと当社との間の本サービスの利用に関わる一切の関係に適用されるものとします。</p>
+              <h3>第2条（禁止事項）</h3>
+              <p>1. クイズ問題・解説等の無断転載・複製を固く禁止します。<br>
+              2. ファーム（コミュニティ）等において、他の士業受験生への誹謗中傷、暴言、学習のモチベーションを下げる発言、その他マナーに反する行為を禁止します。</p>
+              <h3>第3条（アカウント管理）</h3>
+              <p>ユーザーは、自己の責任において本サービスのアカウント情報を適切に管理するものとし、第三者への貸与や譲渡を禁止します。</p>
+              <h3>第4条（サービスの停止等）</h3>
+              <p>当社は、保守点検等のため、事前の通知なく本サービスの提供を一時的に停止できるものとします。</p>
+            </div>
+            <div class="terms-modal-footer">
+              <button class="primary-btn" style="width:100px; margin:0 auto;" @click="showTermsModal = false">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="fade">
+        <div class="terms-modal-overlay" v-if="showPrivacyModal" @click.self="showPrivacyModal = false">
+          <div class="terms-modal-content">
+            <div class="terms-modal-header">プライバシーポリシー</div>
+            <div class="terms-modal-body">
+              <h3>1. 個人情報の収集と利用</h3>
+              <p>本アプリは、アカウント作成および本人確認のためにメールアドレスを取得します。取得した情報はアプリの提供（ログイン管理、学習データの保存、ランキング表示等）のみに利用し、法令に基づく場合を除き、第三者への提供は一切行いません。</p>
+              <h3>2. データの保護とセキュリティ</h3>
+              <p>通信は全て暗号化され、ユーザーデータはセキュアなデータベース（Supabase）にて厳重に管理されます。パスワードは復元不可能な形式でハッシュ化して保存されます。</p>
+              <h3>3. クッキー等の利用</h3>
+              <p>本サービスでは、ログイン状態の維持等のためにローカルストレージおよびセッション機能を使用しています。</p>
+            </div>
+            <div class="terms-modal-footer">
+              <button class="primary-btn" style="width:100px; margin:0 auto;" @click="showPrivacyModal = false">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </transition>
+      <transition name="fade">
+        <div class="terms-modal-overlay" v-if="showConfetti" style="z-index: 99999; flex-direction: column;">
+          <div style="font-size: 80px; animation: bounce 1s infinite;">🎊</div>
+          <div class="terms-modal-content" style="text-align: center; max-width: 400px; background: linear-gradient(135deg, var(--primary-navy), #1A365D); color: white; border: 2px solid var(--accent-gold);">
+            <div class="terms-modal-header" style="color: var(--accent-gold); border-bottom: 1px dashed rgba(212,175,55,0.5);">{{ celebrationTitle }}</div>
+            <div class="terms-modal-body" style="color: white; font-size: 15px; font-weight: bold; white-space: pre-wrap; line-height: 1.8;">
+              {{ celebrationMessage }}
+            </div>
+            <div class="terms-modal-footer">
+              <button class="primary-btn" style="background: var(--accent-gold); color: var(--primary-navy);" @click="showConfetti = false">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </transition>
+  </div>
+  <style>
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+  </style>
+
+  <script>
+    const SUPABASE_URL = 'https://rpotoheaclduasytlfbv.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_26VxZwpI-640Lq59h3BR7w_k91jiwhM';
+    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const { createApp, ref, computed, watch, onMounted } = Vue;
+
+    const fallbackQuestions = [
+      { "id": 1, "topic": "国民経済計算", "year": 2025, "question_no": 1, "statement": "【ダミー】GDPはフローの概念である。", "is_correct": true, "explanation": "GDPは一定期間の流れ（フロー）です。" },
+      { "id": 2, "topic": "景気動向", "year": 2024, "question_no": 2, "statement": "【ダミー】有効求人倍率は先行系列である。", "is_correct": false, "explanation": "有効求人倍率は一致系列です。" },
+      { "id": 3, "topic": "金融政策", "year": 2023, "question_no": 3, "statement": "【ダミー】日銀が買いオペを行うとマネーストックは増加する。", "is_correct": true, "explanation": "資金が市場に供給されるため増加します。" }
+    ];
+
+    const TITLES = [
+      "アソシエイト（見習い）", "ジュニア・コンサルタント", "専任コンサルタント", "シニア・コンサルタント", "主任チーフ・アナリスト",
+      "プラクティス・リーダー", "マネージャー（論点統括）", "シニア・マネージャー", "統括マネージャー", "プリンシパル",
+      "ジュニア・パートナー", "専任パートナー", "シニア・パートナー", "統括シニア・パートナー", "ディレクター（執行役員）",
+      "常務ディレクター", "専務ディレクター", "マネージング・ディレクター", "エグゼクティブ・ディレクター", "最高幹部（ボードメンバー）",
+      "👑 終身シニア・パートナー"
+    ];
+
+    const app = createApp({
+      setup() {
+        // --- Multi-User Auth & State Management ---
+        // --- Multi-User Auth & State Management ---
+        const authScreen = ref('login');
+        const currentUser = ref(null);
+        let app_users = JSON.parse(localStorage.getItem('app_users')) || {};
+
+        onMounted(async () => {
+          const { data: { session } } = await supa.auth.getSession();
+          if (session) {
+            currentUser.value = session.user.id;
+            if (!app_users[currentUser.value]) {
+              app_users[currentUser.value] = {
+                password: 'supabase_auth',
+                isPremium: false, chatCount: 0, lastChatDate: new Date().toDateString(),
+                displayName: session.user.email.split('@')[0].slice(0, 12),
+                modes: { shindanshi: { isFarmMember: true, isFirmOwner: false, myFarmId: 'f_123', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } }
+              };
+              localStorage.setItem('app_users', JSON.stringify(app_users));
+            }
+            loadGlobalData();
+            await syncUserProfile(currentUser.value);
+            authScreen.value = 'app';
+          }
+        });
+
+        const loginUsername = ref('');
+        const loginPassword = ref('');
+        const loginError = ref('');
+
+        const regUsername = ref('');
+        const regPassword = ref('');
+        const regIntro = ref('');
+        const regError = ref('');
+        const agreedToTerms = ref(false);
+        const showTermsModal = ref(false);
+        const showPrivacyModal = ref(false);
+
+        const displayName = ref('あなた');
+
+        // Reactive Stats
+        const isPremium = ref(false);
+        const isFarmMember = ref(true);
+        const isFirmOwner = ref(false);
+        const myFarmId = ref('f_123');
+        const totalExp = ref(0);
+        
+        const dailyCorrect = ref(0);
+        const dailyCombo = ref(0);
+        const maxCombo = ref(0);
+        const unlockedBadges = ref(['🔰 新人']);
+        const activeBadge = ref('🔰 新人');
+
+        const selfIntro = ref('');
+        const friendCount = ref(5);
+        const chatCount = ref(0);
+
+        const friendsList = ref([]);
+        const directChats = ref({});
+        const requestedFriends = ref([]);
+        const correctCounts = ref({});
+        const masteredBlocks = ref({});
+        const masteredSubjects = ref({});
+        const specialTitle = ref('');
+        const currentStudySubjId = ref(null);
+        const currentStudyBlockIndex = ref(null);
+        const showConfetti = ref(false);
+        const celebrationMessage = ref('');
+        const celebrationTitle = ref('');
+        const friendRoute = ref('list');
+        const friendSearch = ref('');
+        const activeFriend = ref(null);
+        const directChatInput = ref('');
+
+        const SUBJECTS = [
+          { id: 'keizai', name: '📊 経済学・経済政策' },
+          { id: 'zaimu', name: '💰 財務・会計' },
+          { id: 'kigyou', name: '🏢 企業経営理論' },
+          { id: 'unei', name: '🏭 運営管理' },
+          { id: 'houmu', name: '⚖️ 経営法務' },
+          { id: 'jouhou', name: '💻 経営情報システム' },
+          { id: 'chusho', name: '📈 中小企業経営・政策' }
+        ];
+
+        const generateRooms = () => {
+          const rooms = [];
+          for (let i = 1; i <= 10; i++) {
+            rooms.push({ id: `silent_${i}`, type: 'silent', name: `サイレント自習室 ${i}号室`, capacity: 50, count: Math.floor(Math.random() * 51) });
+          }
+          for (let i = 1; i <= 20; i++) {
+            rooms.push({ id: `chat_${i}`, type: 'chat', name: `チャット推奨室 ${i}号室`, capacity: 30, count: Math.floor(Math.random() * 31) });
+          }
+          return rooms;
+        };
+
+        const STUDY_ROOMS = ref(generateRooms());
+        const lobbyActiveTab = ref('silent');
+        const expandedSubject = ref(null);
+        
+        const quizSettings = ref({
+          isRandom: true,
+          excludeMastered: false
+        });
+
+        const showBadgeModal = ref(false);
+        const ALL_BADGES = [
+          { id: '🔰 新人', name: '新人', icon: '🔰' },
+          { id: '日課の始まり', name: '日課の始まり', icon: '📅' },
+          { id: 'スワイプの鬼', name: 'スワイプの鬼', icon: '👆' },
+          { id: 'ゾーン突入', name: 'ゾーン突入', icon: '🔥' },
+          { id: '神の打率', name: '神の打率', icon: '🎯' },
+          { id: '10分間の支配者', name: '10分間の支配者', icon: '⏱️' },
+          { id: '完全無欠', name: '完全無欠', icon: '✨' },
+          { id: '創業者', name: '創業者', icon: '🏛️' }
+        ];
+
+        const equipBadge = (badgeId) => {
+          if (unlockedBadges.value.includes(badgeId)) {
+            activeBadge.value = badgeId;
+            showBadgeModal.value = false;
+            saveUserProfile();
+          }
+        };
+
+        const filteredFriends = computed(() => {
+          if (!friendSearch.value.trim()) return friendsList.value;
+          const q = friendSearch.value.toLowerCase();
+          return friendsList.value.filter(f => f.name.toLowerCase().includes(q));
+        });
+
+        const activeMode = ref(null);
+
+        const loadGlobalData = () => {
+          if (!currentUser.value || !app_users[currentUser.value]) return;
+          const u = app_users[currentUser.value];
+          isPremium.value = u.isPremium || false;
+          displayName.value = u.displayName || currentUser.value;
+          
+          const todayStr = new Date().toDateString();
+          if (u.lastChatDate === todayStr) {
+            chatCount.value = u.chatCount || 0;
+          } else {
+            chatCount.value = 0;
+            u.lastChatDate = todayStr;
+          }
+        };
+
+        const loadModeData = () => {
+          if (!currentUser.value || !app_users[currentUser.value] || !activeMode.value) return;
+          const u = app_users[currentUser.value];
+          
+          // Migration from old flat data structure
+          if (!u.modes) {
+            u.modes = {
+              shindanshi: {
+                isFarmMember: u.isFarmMember !== undefined ? u.isFarmMember : true,
+                isFirmOwner: false,
+                totalExp: u.totalExp || 0,
+                dailyCorrect: u.dailyCorrect || 0,
+                dailyCombo: u.dailyCombo || 0,
+                maxCombo: u.maxCombo || 0,
+                unlockedBadges: u.unlockedBadges || ['🔰 新人'],
+                activeBadge: u.activeBadge || '🔰 新人',
+                selfIntro: u.selfIntro || '',
+                friendCount: u.friendCount || 5,
+                friendsList: [],
+                directChats: {},
+                requestedFriends: [],
+                correctCounts: {}
+              }
+            };
+          }
+          if (!u.modes[activeMode.value]) {
+            u.modes[activeMode.value] = {
+              isFarmMember: true, isFirmOwner: false, myFarmId: 'f_123', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0,
+              unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5,
+              friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {},
+              masteredBlocks: {}, masteredSubjects: {}, specialTitle: ''
+            };
+          }
+          
+          const m = u.modes[activeMode.value];
+          isFarmMember.value = m.isFarmMember;
+          isFirmOwner.value = m.isFirmOwner || false;
+          myFarmId.value = m.myFarmId || 'f_123';
+          totalExp.value = m.totalExp;
+          
+          const todayStr = new Date().toDateString();
+          if (u.lastChatDate === todayStr) {
+            dailyCorrect.value = m.dailyCorrect || 0;
+            dailyCombo.value = m.dailyCombo || 0;
+            maxCombo.value = m.maxCombo || 0;
+          } else {
+            dailyCorrect.value = 0;
+            dailyCombo.value = 0;
+            maxCombo.value = 0;
+          }
+          
+          unlockedBadges.value = m.unlockedBadges || ['🔰 新人'];
+          activeBadge.value = m.activeBadge || '🔰 新人';
+          selfIntro.value = m.selfIntro || '';
+          friendCount.value = m.friendCount || 5;
+          friendsList.value = m.friendsList || [];
+          directChats.value = m.directChats || {};
+          requestedFriends.value = m.requestedFriends || [];
+          correctCounts.value = m.correctCounts || {};
+          masteredBlocks.value = m.masteredBlocks || {};
+          masteredSubjects.value = m.masteredSubjects || {};
+          specialTitle.value = m.specialTitle || '';
+        };
+
+        const selectMode = (mode) => {
+          activeMode.value = mode;
+          loadModeData();
+        };
+
+        const syncUserProfile = async (userId) => {
+          try {
+            const { data, error } = await supa.from('user_profiles').select('*').eq('id', userId).single();
+            if (error && error.code === 'PGRST116') {
+              const newProfile = {
+                id: userId,
+                total_exp: 0,
+                level: 1,
+                unlocked_badges: ['🔰 新人'],
+                active_badge: '🔰 新人'
+              };
+              await supa.from('user_profiles').insert([newProfile]);
+              totalExp.value = 0;
+              unlockedBadges.value = ['🔰 新人'];
+              activeBadge.value = '🔰 新人';
+            } else if (data) {
+              totalExp.value = data.total_exp || 0;
+              unlockedBadges.value = data.unlocked_badges || ['🔰 新人'];
+              activeBadge.value = data.active_badge || '🔰 新人';
+            }
+          } catch (e) {
+            console.error('Profile sync error:', e);
+          }
+        };
+
+        const saveUserProfile = async () => {
+          if (!currentUser.value) return;
+          try {
+            const profile = {
+              id: currentUser.value,
+              user_name: displayName.value,
+              title: currentTitle.value,
+              total_exp: totalExp.value,
+              level: currentLevel.value,
+              unlocked_badges: unlockedBadges.value,
+              active_badge: activeBadge.value
+            };
+            await supa.from('user_profiles').upsert([profile]);
+          } catch (e) {
+            console.error('Profile save error:', e);
+          }
+        };
+
+        if (currentUser.value) {
+          loadGlobalData();
+        }
+
+
+
+        // Auto Save Watcher
+        watch([isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, dailyCorrect, dailyCombo, maxCombo, unlockedBadges, activeBadge, selfIntro, friendCount, chatCount, friendsList, directChats, requestedFriends, correctCounts], () => {
+          if (!currentUser.value || !app_users[currentUser.value]) return;
+          const u = app_users[currentUser.value];
+          u.isPremium = isPremium.value;
+          u.displayName = displayName.value;
+          u.chatCount = chatCount.value;
+          u.lastChatDate = new Date().toDateString();
+          
+          if (activeMode.value) {
+            if (!u.modes) u.modes = {};
+            if (!u.modes[activeMode.value]) u.modes[activeMode.value] = {};
+            const m = u.modes[activeMode.value];
+            m.isFarmMember = isFarmMember.value;
+            m.isFirmOwner = isFirmOwner.value;
+            m.myFarmId = myFarmId.value;
+            m.totalExp = totalExp.value;
+            m.dailyCorrect = dailyCorrect.value;
+            m.dailyCombo = dailyCombo.value;
+            m.maxCombo = maxCombo.value;
+            m.unlockedBadges = [...unlockedBadges.value];
+            m.activeBadge = activeBadge.value;
+            m.selfIntro = selfIntro.value;
+            m.friendCount = friendCount.value;
+            m.friendsList = JSON.parse(JSON.stringify(friendsList.value));
+            m.directChats = JSON.parse(JSON.stringify(directChats.value));
+            m.requestedFriends = JSON.parse(JSON.stringify(requestedFriends.value));
+            m.correctCounts = JSON.parse(JSON.stringify(correctCounts.value));
+          }
+          localStorage.setItem('app_users', JSON.stringify(app_users));
+        }, { deep: true });
+
+        // LEVEL & TITLE LOGIC
+        const EXP_TABLE = [];
+        for (let i = 1; i <= 100; i++) {
+          EXP_TABLE[i] = Math.round(Math.pow((i - 1) / 99, 3.5) * 1000000);
+        }
+
+        const currentLevel = computed(() => {
+          if (totalExp.value >= EXP_TABLE[100]) return 100;
+          if (totalExp.value <= 0) return 1;
+          for (let i = 100; i >= 1; i--) {
+            if (totalExp.value >= EXP_TABLE[i]) return i;
+          }
+          return 1;
+        });
+
+        const nextLevelExp = computed(() => {
+          const lv = currentLevel.value;
+          if (lv >= 100) return EXP_TABLE[100];
+          return EXP_TABLE[lv + 1];
+        });
+        
+        const currentLevelStartExp = computed(() => {
+          const lv = currentLevel.value;
+          return EXP_TABLE[lv];
+        });
+
+        const expProgressPercent = computed(() => {
+          if (currentLevel.value >= 100) return 100;
+          const range = nextLevelExp.value - currentLevelStartExp.value;
+          const current = totalExp.value - currentLevelStartExp.value;
+          return Math.min(100, Math.max(0, (current / range) * 100));
+        });
+
+        const currentTitle = computed(() => {
+          if (specialTitle.value) return specialTitle.value;
+          const lv = currentLevel.value;
+          if (lv >= 100) return TITLES[20];
+          const idx = Math.floor((lv - 1) / 5);
+          return TITLES[Math.min(idx, 19)];
+        });
+
+        const showLevelUp = ref(false);
+        const levelUpMessage = ref('');
+        const showBadgeToast = ref(false);
+        const badgeToastMessage = ref('');
+
+        // --- Google Play & Ads ---
+        const showBenefitScreen = ref(false);
+        const showGPlayModal = ref(false);
+        const isProcessingPayment = ref(false);
+
+        const doGooglePlayPurchase = () => {
+          isProcessingPayment.value = true;
+          setTimeout(() => {
+            isProcessingPayment.value = false;
+            showGPlayModal.value = false;
+            isPremium.value = true;
+            badgeToastMessage.value = "プレミアムプランの支払いが完了しました！";
+            showBadgeToast.value = true;
+            setTimeout(() => { showBadgeToast.value = false; }, 4000);
+          }, 3000);
+        };
+
+        const showInterstitialAd = ref(false);
+        const adCountdown = ref(3);
+        const pendingTransitionCallback = ref(null);
+        let adTimer = null;
+
+        const triggerInterstitial = (callback, force = false) => {
+          if (!force && (isPremium.value || Math.random() >= 0.3)) {
+            if (callback) callback();
+            return;
+          }
+          pendingTransitionCallback.value = callback;
+          adCountdown.value = 3;
+          showInterstitialAd.value = true;
+          
+          if (adTimer) clearInterval(adTimer);
+          adTimer = setInterval(() => {
+            if (adCountdown.value > 0) {
+              adCountdown.value--;
+            } else {
+              clearInterval(adTimer);
+            }
+          }, 1000);
+        };
+
+        const closeInterstitialAd = () => {
+          showInterstitialAd.value = false;
+          if (adTimer) clearInterval(adTimer);
+          if (pendingTransitionCallback.value) {
+            pendingTransitionCallback.value();
+            pendingTransitionCallback.value = null;
+          }
+        };
+
+        const addExp = (baseExp) => {
+          const oldLevel = currentLevel.value;
+          const gainedExp = isPremium.value ? baseExp * 3 : baseExp;
+          totalExp.value += gainedExp;
+          
+          if (totalExp.value > EXP_TABLE[100]) {
+            totalExp.value = EXP_TABLE[100];
+          }
+          
+          const newLevel = currentLevel.value;
+          if (newLevel > oldLevel) {
+            levelUpMessage.value = `Lv.${oldLevel} ➔ Lv.${newLevel}`;
+            showLevelUp.value = true;
+            setTimeout(() => { showLevelUp.value = false; }, 3000);
+          }
+          saveUserProfile();
+        };
+
+        const checkBadges = (isFromExam = false, examScore = 0) => {
+          const unlocks = [];
+          if (dailyCorrect.value >= 50 && !unlockedBadges.value.includes('日課の始まり')) unlocks.push('日課の始まり');
+          if (dailyCorrect.value >= 500 && !unlockedBadges.value.includes('スワイプの鬼')) unlocks.push('スワイプの鬼');
+          if (dailyCombo.value >= 30 && !unlockedBadges.value.includes('ゾーン突入')) unlocks.push('ゾーン突入');
+          if (dailyCombo.value >= 100 && !unlockedBadges.value.includes('神の打率')) unlocks.push('神の打率');
+          if (isFromExam && examScore >= 90 && !unlockedBadges.value.includes('10分間の支配者')) unlocks.push('10分間の支配者');
+
+          if (unlocks.length > 0) {
+            unlockedBadges.value.push(...unlocks);
+            badgeToastMessage.value = unlocks.join(', ');
+            showBadgeToast.value = true;
+            setTimeout(() => { showBadgeToast.value = false; }, 4000);
+            saveUserProfile();
+          }
+        };
+
+        const doLogin = async () => {
+          loginError.value = '';
+          if (!loginUsername.value || !loginPassword.value) { loginError.value = '入力内容が不足しています'; return; }
+          
+          const { data, error } = await supa.auth.signInWithPassword({
+            email: loginUsername.value,
+            password: loginPassword.value,
+          });
+          
+          if (error) { loginError.value = 'ログイン失敗: ' + error.message; return; }
+          
+          currentUser.value = data.user.id;
+          if (!app_users[currentUser.value]) {
+             app_users[currentUser.value] = { password: 'supabase_auth', isPremium: false, chatCount: 0, lastChatDate: new Date().toDateString(), displayName: loginUsername.value.split('@')[0].slice(0, 12), modes: { shindanshi: { isFarmMember: true, isFirmOwner: false, myFarmId: 'f_123', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } } };
+             localStorage.setItem('app_users', JSON.stringify(app_users));
+          }
+          
+          loadGlobalData();
+          await syncUserProfile(currentUser.value);
+          activeMode.value = null;
+          authScreen.value = 'app';
+        };
+
+        const doRegister = async () => {
+          regError.value = '';
+          if (!regUsername.value || !regPassword.value) { regError.value = '入力内容が不足しています'; return; }
+          if (!agreedToTerms.value) { regError.value = '利用規約とプライバシーポリシーへの同意が必要です'; return; }
+          
+          const { data, error } = await supa.auth.signUp({
+            email: regUsername.value,
+            password: regPassword.value,
+          });
+          
+          if (error) { regError.value = '登録失敗: ' + error.message; return; }
+          if (!data.user) { regError.value = 'このメールアドレスは既に登録されています。ログイン画面からログインするか、別のアドレスをお試しください。'; return; }
+
+          currentUser.value = data.user.id;
+          
+          if (!app_users[currentUser.value]) {
+            app_users[currentUser.value] = {
+              password: 'supabase_auth',
+              isPremium: false,
+              chatCount: 0,
+              lastChatDate: new Date().toDateString(),
+              displayName: regUsername.value.split('@')[0].slice(0, 12),
+              modes: {
+                shindanshi: {
+                  isFarmMember: true,
+                  isFirmOwner: false,
+                  myFarmId: 'f_123',
+                  totalExp: 0,
+                  dailyCorrect: 0,
+                  dailyCombo: 0,
+                  maxCombo: 0,
+                  unlockedBadges: ['🔰 新人'],
+                  activeBadge: '🔰 新人',
+                  selfIntro: regIntro.value,
+                  friendCount: 5,
+                  friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {}
+                }
+              }
+            };
+            localStorage.setItem('app_users', JSON.stringify(app_users));
+          }
+          
+          loadGlobalData();
+          await syncUserProfile(currentUser.value);
+          activeMode.value = null;
+          authScreen.value = 'app';
+        };
+
+        const doLogout = async () => {
+          await supa.auth.signOut();
+          currentUser.value = null;
+          loginUsername.value = '';
+          loginPassword.value = '';
+          activeMode.value = null;
+          authScreen.value = 'login';
+        };
+
+        const resetAllData = () => { 
+          localStorage.clear(); 
+          alert('全ユーザーデータとログイン情報を初期化しました。リロードします。');
+          location.reload();
+        };
+
+        // --- Navigation ---
+        const activeTab = ref('home'); 
+        const studyRoute = ref('rooms'); 
+        const profileTab = ref('me');
+
+        // --- Data Loading ---
+        const rawQuestions = ref([]);
+        const loadStatus = ref('未読込');
+        const isLoading = ref(false);
+
+        const paywallConfig = ref({ show: false, title: '', message: '' });
+        const showPaywall = (title, message) => { paywallConfig.value = { show: true, title, message }; };
+
+        // --- Data Normalization ---
+        const normalizeQuestion = (q) => {
+          return {
+            id: q.id,
+            topic: q.topic || '総合',
+            year: q.year || 2025,
+            question_no: q.question_no || (q.id ? String(q.id).slice(-3).replace(/^0+/, '') : 'X'),
+            statement: q.statement || q.question || '',
+            is_correct: q.is_correct !== undefined ? q.is_correct : (q.answer === '〇' || q.answer === '○'),
+            explanation: q.explanation || ''
+          };
+        };
+
+        const goToStudyRoomLobby = async (subjId, blockIndex) => {
+          isLoading.value = true;
+          try {
+            currentStudySubjId.value = subjId;
+            currentStudyBlockIndex.value = blockIndex;
+            const startId = (blockIndex - 1) * 100 + 1;
+            const endId = startId + 99;
+            const blockRange = `${startId}-${endId}`;
+            const subjName = SUBJECTS.find(s => s.id === subjId)?.name || '科目';
+            
+            // CSVインポート時の名前に合わせるためのマッピング
+            const subjNameMap = {
+              'keizai': '経済学',
+              'zaimu': '財務会計',
+              'kigyou': '企業経営',
+              'unei': '運営管理',
+              'houmu': '経営法務',
+              'jouhou': '情報システム',
+              'chusho': '中小政策'
+            };
+            const dbSubject = subjNameMap[subjId] || subjName;
+
+            const { data, error } = await supa
+              .from('quizzes')
+              .select('*')
+              .eq('subject', dbSubject)
+              .eq('block_range', blockRange)
+              .limit(100);
+
+            if (error) {
+              alert('クイズデータの取得に失敗しました: ' + error.message);
+              return;
+            }
+            if (!data || data.length === 0) {
+              alert(`「${subjName}」のブロック ${blockRange} はまだ登録されていません。`);
+              return;
+            }
+
+            rawQuestions.value = data.map(normalizeQuestion);
+            loadStatus.value = `Supabase読込完了`;
+            activeTab.value = 'study';
+            studyRoute.value = 'rooms';
+          } catch (e) {
+            console.error(e);
+          } finally {
+            isLoading.value = false;
+          }
+        };
+
+        const setAllTo2 = () => {
+          if (rawQuestions.value.length > 0) {
+            rawQuestions.value.forEach(q => {
+              correctCounts.value[q.id] = 2;
+            });
+          } else {
+            for(let i=1; i<=100; i++) {
+              correctCounts.value[i] = 2;
+            }
+          }
+          alert('ロード中の問題をすべて「2回正解状態」にしました。\n※あと1回正解でマスター除外対象になります。');
+        };
+
+        const handleFileUpload = (event) => {
+          const input = event.target;
+          if (!input.files[0]) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const rawData = JSON.parse(e.target.result);
+              rawQuestions.value = rawData.map(normalizeQuestion);
+              loadStatus.value = '手動読込成功';
+              alert(`読み込み成功（計 ${rawQuestions.value.length} 問）`);
+            } catch (err) { alert('解析エラー'); }
+            input.value = '';
+          };
+          reader.readAsText(input.files[0]);
+        };
+
+        // --- LIVE EXAM (21:00) Logic ---
+        let serverTimeOffset = 0;
+        
+        const syncServerTime = async () => {
+          try {
+            const start = Date.now();
+            const { data, error } = await supa.rpc('get_server_time');
+            if (!error && data) {
+              const serverTime = new Date(data).getTime();
+              const end = Date.now();
+              const latency = (end - start) / 2;
+              serverTimeOffset = (serverTime + latency) - Date.now();
+            }
+          } catch (e) {
+            console.error('Server time sync failed', e);
+          }
+        };
+
+        const getServerAdjustedNow = () => {
+          return new Date(Date.now() + serverTimeOffset);
+        };
+
+        const examCountdownString = ref('');
+        const isExamLive = ref(false);
+        
+        const updateCountdown = () => {
+          if (authScreen.value !== 'app') return;
+          const now = getServerAdjustedNow();
+          const target = getServerAdjustedNow();
+          target.setHours(21, 0, 0, 0);
+          
+          if (now.getHours() === 21 && now.getMinutes() < 10) {
+            isExamLive.value = true;
+            return;
+          } else if (now > target) {
+            target.setDate(target.getDate() + 1);
+          }
+          isExamLive.value = false;
+          
+          const diff = target - now;
+          const h = Math.floor(diff / (1000 * 60 * 60));
+          const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const s = Math.floor((diff % (1000 * 60)) / 1000);
+          examCountdownString.value = `${h}時間${m}分${s}秒`;
+        };
+        
+        syncServerTime();
+        setInterval(syncServerTime, 1000 * 60 * 60);
+
+        setInterval(updateCountdown, 1000);
+        updateCountdown();
+
+        const examQueue = ref([]);
+        const examCurrentIndex = ref(0);
+        const examCorrectCount = ref(0);
+        const isExamFinished = ref(false);
+        const examTimeLeft = ref(600);
+        const examTotalTime = ref(600);
+        let examTimerInterval = null;
+
+        const examCurrentQuestion = computed(() => examQueue.value[examCurrentIndex.value] || {});
+        const formattedExamTime = computed(() => {
+          const m = Math.floor(examTimeLeft.value / 60);
+          const s = examTimeLeft.value % 60;
+          return `${m}:${s.toString().padStart(2, '0')}`;
+        });
+
+        const startMockExam = (durationSeconds = 600) => {
+          if (rawQuestions.value.length === 0) rawQuestions.value = fallbackQuestions.map(normalizeQuestion);
+
+          let pool = [...rawQuestions.value];
+          let hundred = [];
+          while(hundred.length < 100) {
+            pool.sort(() => 0.5 - Math.random());
+            for(let q of pool) {
+              if(hundred.length < 100) hundred.push(q);
+              else break;
+            }
+          }
+          
+          examQueue.value = hundred;
+          examCurrentIndex.value = 0;
+          examCorrectCount.value = 0;
+          isExamFinished.value = false;
+          
+          examTotalTime.value = durationSeconds;
+          examTimeLeft.value = durationSeconds;
+          activeTab.value = 'exam';
+          
+          if(examTimerInterval) clearInterval(examTimerInterval);
+          examTimerInterval = setInterval(() => {
+            examTimeLeft.value--;
+            if (examTimeLeft.value <= 0) {
+              clearInterval(examTimerInterval);
+              endExam();
+            }
+          }, 1000);
+        };
+
+        const handleExamAnswer = (userAnswer) => {
+          if (isExamFinished.value) return;
+          const correct = (userAnswer === examCurrentQuestion.value.is_correct);
+          if (correct) {
+            examCorrectCount.value++;
+            dailyCorrect.value++;
+            dailyCombo.value++;
+            if(dailyCombo.value > maxCombo.value) maxCombo.value = dailyCombo.value;
+          } else {
+            dailyCombo.value = 0;
+          }
+          checkBadges();
+          
+          examCurrentIndex.value++;
+          if (examCurrentIndex.value >= examQueue.value.length) {
+            endExam();
+          }
+        };
+
+        const endExam = () => {
+          isExamFinished.value = true;
+          addExp(examCorrectCount.value * 10);
+          if (examCorrectCount.value >= 90) checkBadges(true, examCorrectCount.value);
+          if (examTimerInterval) clearInterval(examTimerInterval);
+        };
+
+        const returnToFirmFromExam = () => {
+          activeTab.value = 'firm';
+          if (isFarmMember.value) {
+            firmRoute.value = 'chat';
+            firmChat.value.push({
+              sender: 'システム',
+              text: `🏆 本日の模試が終了しました！当ファームの平均点は ${Math.floor(Math.random() * 20) + 60} / 100点 でした！復習を忘れずに！`
+            });
+            const el = document.getElementById('firmChatArea');
+            if(el) setTimeout(() => el.scrollTop = el.scrollHeight, 100);
+          } else {
+            firmJoinRoute.value = 'lobby';
+          }
+        };
+
+        // --- Study Room Logic ---
+        const activeRoom = ref(null);
+        
+        const getRoomStatusText = (room) => {
+          const ratio = room.count / room.capacity;
+          if (ratio >= 1) return '満員';
+          if (ratio >= 0.7) return '混雑';
+          return '空き';
+        };
+        const getRoomStatusClass = (room) => {
+          const ratio = room.count / room.capacity;
+          if (ratio >= 1) return 'status-full';
+          if (ratio >= 0.7) return 'status-normal';
+          return 'status-empty';
+        };
+
+        const enterRoomNew = (room) => {
+          if (room.count >= room.capacity) {
+            alert('満員のため入室できません。他の部屋をお選びください。');
+            return;
+          }
+          activeRoom.value = room;
+          room.count++;
+          if (room.type === 'chat') {
+            studyLogs.value = [];
+            subscribeToRoom('self_study_room', studyLogs, (msg) => {
+              const timeStr = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+              return { time: timeStr, text: `<strong style="color:var(--accent-gold);">[${msg.avatar_badge}] ${msg.user_name}:</strong> ${msg.content}` };
+            });
+          }
+          startQuizFlow();
+        };
+
+        const quizQueue = ref([]);
+        const currentQuestionIndex = ref(0);
+        const showFeedback = ref(false);
+        const isCorrect = ref(false);
+        const correctCount = ref(0);
+        
+        const currentQuestion = computed(() => quizQueue.value[currentQuestionIndex.value] || {});
+        const isFinished = computed(() => quizQueue.value.length === 0 || currentQuestionIndex.value >= quizQueue.value.length);
+
+        let timelineInterval = null;
+
+        const startQuizFlow = () => {
+          let pool = [...rawQuestions.value];
+          // マスター除外フィルタ
+          if (quizSettings.value.excludeMastered) {
+            pool = pool.filter(q => (correctCounts.value[q.id] || 0) < 3);
+          }
+          if (pool.length === 0) {
+            alert('このブロックの問題はすべてマスター済みです！素晴らしいです！');
+            return;
+          }
+          // ランダム出題
+          if (quizSettings.value.isRandom) {
+            pool.sort(() => 0.5 - Math.random());
+          }
+          
+          quizQueue.value = pool;
+          currentQuestionIndex.value = 0;
+          correctCount.value = 0;
+          showFeedback.value = false;
+          studyRoute.value = 'quiz';
+          studyLogs.value = [];
+          
+          const rn = activeRoom.value?.name || '自習室';
+          studyLogs.value.push({ time: getFormattedTime(), text: `<strong style="color:#0F9D58;">システム:</strong> 「${rn}」に入室しました。` });
+          
+          if(timelineInterval) clearInterval(timelineInterval);
+          timelineInterval = setInterval(generateRandomStudyLog, Math.random() * 3000 + 3000);
+        };
+
+        const triggerCelebration = (msg, isLegend = false) => {
+          celebrationMessage.value = msg;
+          celebrationTitle.value = isLegend ? '👑 7,000問完全制覇 👑' : '🎉 科目マスター達成 🎉';
+          showConfetti.value = true;
+          setTimeout(() => { showConfetti.value = false; }, 8000);
+        };
+
+        const handleAnswer = (userAnswer) => {
+          isCorrect.value = (userAnswer === currentQuestion.value.is_correct);
+          if(isCorrect.value) {
+            correctCount.value++;
+            dailyCorrect.value++;
+            dailyCombo.value++;
+            if(dailyCombo.value > maxCombo.value) maxCombo.value = dailyCombo.value;
+            addExp(10);
+            
+            // マスター正解数のカウント
+            const qid = currentQuestion.value.id;
+            correctCounts.value[qid] = (correctCounts.value[qid] || 0) + 1;
+            
+            // --- マスター判定ロジック ---
+            if (rawQuestions.value.length > 0 && currentStudySubjId.value && currentStudyBlockIndex.value) {
+              const allMastered = rawQuestions.value.every(q => (correctCounts.value[q.id] || 0) >= 3);
+              const blockKey = `${currentStudySubjId.value}_${currentStudyBlockIndex.value}`;
+              
+              if (allMastered && !masteredBlocks.value[blockKey]) {
+                masteredBlocks.value[blockKey] = true;
+                saveUserProfile();
+                
+                // 1科目（10ブロック）制覇判定
+                let subjectMastered = true;
+                for (let i = 1; i <= 10; i++) {
+                  if (!masteredBlocks.value[`${currentStudySubjId.value}_${i}`]) {
+                    subjectMastered = false; break;
+                  }
+                }
+                
+                if (subjectMastered && !masteredSubjects.value[currentStudySubjId.value]) {
+                  masteredSubjects.value[currentStudySubjId.value] = true;
+                  const subjName = SUBJECTS.find(s => s.id === currentStudySubjId.value)?.name || '';
+                  const cleanName = subjName.replace(/[^ぁ-んァ-ン一-龥a-zA-Z]/g, '');
+                  
+                  // 専用称号の解放
+                  const newTitle = `${cleanName}の覇者`;
+                  if (!unlockedBadges.value.includes(newTitle)) unlockedBadges.value.push(newTitle);
+                  specialTitle.value = newTitle;
+                  activeBadge.value = newTitle;
+                  saveUserProfile();
+                  
+                  triggerCelebration(`【祝・${cleanName}マスター！】\n1,000問の壁を突破！この努力は裏切らない！`);
+                  
+                  // 全科目（7科目）完全制覇判定
+                  let allSubjMastered = true;
+                  for (let s of SUBJECTS) {
+                    if (!masteredSubjects.value[s.id]) {
+                      allSubjMastered = false; break;
+                    }
+                  }
+                  
+                  if (allSubjMastered) {
+                    setTimeout(() => {
+                      triggerCelebration(`全7科目・計7,000問の頂点に立ちました！\nあなたは無敵です！！`, true);
+                      const legendTitle = '👑 全知全能の神';
+                      if (!unlockedBadges.value.includes(legendTitle)) unlockedBadges.value.push(legendTitle);
+                      specialTitle.value = legendTitle;
+                      activeBadge.value = legendTitle;
+                      saveUserProfile();
+                    }, 4000);
+                  }
+                }
+              }
+            }
+          } else {
+            dailyCombo.value = 0;
+          }
+          checkBadges();
+          showFeedback.value = true;
+        };
+
+        const nextQuestion = () => {
+          showFeedback.value = false;
+          currentQuestionIndex.value++;
+          if (isFinished.value && timelineInterval) {
+            clearInterval(timelineInterval);
+          }
+        };
+
+        // --- Timelines & Chats ---
+        const getFormattedTime = () => {
+          const d = new Date();
+          return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+        };
+
+        const studyLogs = ref([]);
+        const DUMMY_STUDY_USERS = [
+          { id: 'su_1', farmId: 'other_farm', name: 'アソシエイトA', level: 12, title: 'アソシエイト', badge: '🔰 新人', intro: 'よろしくお願いします！' },
+          { id: 'su_2', farmId: 'other_farm', name: '財務の鬼', level: 25, title: 'シニア・アソシエイト', badge: '🔥 熱血', intro: '財務特化型です。' },
+          { id: 'su_3', farmId: 'other_farm', name: 'Bさん', level: 5, title: 'アソシエイト', badge: '📚 勉強鬼', intro: '毎日コツコツ。' },
+          { id: 'su_4', farmId: 'other_farm', name: '合格祈願', level: 42, title: 'マネージャー', badge: '🏆 ランカー', intro: '今年で絶対受かる。' },
+          { id: 'su_5', farmId: 'other_farm', name: '診断士2026', level: 18, title: 'アソシエイト', badge: '🔰 新人', intro: '過去問回してます。' },
+          { id: 'su_6', farmId: 'other_farm', name: 'Yさん', level: 30, title: 'シニア・アソシエイト', badge: '🔥 熱血', intro: '一緒に頑張りましょう。' }
+        ];
+        const studyActions = ['が正解しました！', 'が3連続正解🔥', 'が入室しました', 'が苦戦中...'];
+        const chatMessages = ['財務の事例Ⅳが難しい…', '今日の21時模試がんばりましょう！', '経済学のグラフが覚えられないです', 'お疲れ様です！', 'みなさん進捗どうですか？', '情報システムは過去問回せばいけます！'];
+
+        const generateRandomStudyLog = () => {
+          if (authScreen.value !== 'app' || studyRoute.value !== 'quiz') return;
+          const u = DUMMY_STUDY_USERS[Math.floor(Math.random() * DUMMY_STUDY_USERS.length)];
+          
+          if (activeRoom.value?.type === 'silent') {
+            const action = studyActions[Math.floor(Math.random() * studyActions.length)];
+            studyLogs.value.push({ time: getFormattedTime(), user: u, action: action, type: 'silent' });
+          }
+          
+          if(studyLogs.value.length > 30) studyLogs.value.shift();
+          const el = document.getElementById('studyLogs');
+          if(el) setTimeout(() => el.scrollTop = el.scrollHeight, 100);
+        };
+
+        const openStudyUserProfile = (u) => {
+          activeFirmMember.value = u;
+          showMemberProfileModal.value = true;
+        };
+
+        const canSendChat = computed(() => isPremium.value || chatCount.value < 10);
+        
+        const studyChatInput = ref('');
+        let currentChatChannel = null;
+        const subscribeToRoom = async (roomId, targetArrayRef, formatMessage) => {
+          if (currentChatChannel) {
+            await supa.removeChannel(currentChatChannel);
+            currentChatChannel = null;
+          }
+          try {
+            const { data: history, error } = await supa.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: true }).limit(50);
+            if (error) {
+              console.error('History fetch error:', error);
+            }
+            if (history) {
+              targetArrayRef.value = history.map(formatMessage);
+              setTimeout(() => {
+                const els = document.querySelectorAll('.firm-chat-timeline, .timeline-logs');
+                els.forEach(el => el.scrollTop = el.scrollHeight);
+              }, 100);
+            }
+            currentChatChannel = supa.channel(`room_${roomId}`)
+              .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, payload => {
+                // 自分の発言は送信時に即時追加するため、リアルタイム購読からは除外する
+                if (payload.new.user_id !== currentUser.value) {
+                  targetArrayRef.value.push(formatMessage(payload.new));
+                  setTimeout(() => {
+                    const els = document.querySelectorAll('.firm-chat-timeline, .timeline-logs');
+                    els.forEach(el => el.scrollTop = el.scrollHeight);
+                  }, 100);
+                }
+              }).subscribe();
+          } catch (e) { console.error(e); }
+        };
+
+        const sendStudyChat = async () => {
+          if (!canSendChat.value) {
+            showPaywall('チャット送信枠の上限', '無料プランでの送信は1日10回までです。プレミアムに加入しましょう！');
+            return;
+          }
+          if(studyChatInput.value.trim()){
+            const content = studyChatInput.value;
+            studyChatInput.value = '';
+            chatCount.value++;
+            
+            // 即時UI反映
+            const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            studyLogs.value.push({ time: timeStr, text: `<strong style="color:var(--accent-gold);">[${activeBadge.value}] ${displayName.value}:</strong> ${content}` });
+            setTimeout(() => {
+              const el = document.getElementById('studyLogs');
+              if(el) el.scrollTop = el.scrollHeight;
+            }, 100);
+
+            const { error } = await supa.from('messages').insert([{
+              room_id: 'self_study_room',
+              user_id: currentUser.value,
+              user_name: displayName.value,
+              avatar_badge: activeBadge.value,
+              content: content
+            }]);
+            if (error) {
+              alert('メッセージ送信に失敗しました: ' + error.message);
+            }
+          }
+        };
+
+        const generateFirmMembers = () => {
+          const badges = ['🔰 新人', '🔥 熱血', '📚 勉強鬼', '🏆 ランカー'];
+          const intros = ['絶対合格！', '毎日コツコツ頑張ります', '模試で負けません', 'よろしくお願いします！', '過去問中心に勉強中です。', '今年こそは！'];
+          return Array.from({length: 9}, (_, i) => {
+            const lv = Math.floor(Math.random() * 30) + 1;
+            const titleIdx = Math.floor((lv - 1) / 5);
+            return {
+              id: 'firm_u' + i,
+              farmId: myFarmId.value,
+              name: `アソシエイト ${i+1}号`,
+              level: lv,
+              title: TITLES[Math.min(titleIdx, 19)],
+              badge: badges[Math.floor(Math.random() * badges.length)],
+              intro: intros[Math.floor(Math.random() * intros.length)]
+            };
+          });
+        };
+        const firmMembers = ref(generateFirmMembers());
+        const addDummyFirmMembers = (count) => {
+          const badges = ['🔰 新人', '🔥 熱血', '📚 勉強鬼', '🏆 ランカー', '✨ 期待の新星'];
+          const intros = ['絶対合格！', 'よろしくお願いします！', '過去問復習中。', '今日も徹夜です'];
+          for(let i=0; i<count; i++) {
+            const lv = Math.floor(Math.random() * 30) + 1;
+            const titleIdx = Math.floor((lv - 1) / 5);
+            firmMembers.value.push({
+              id: 'firm_u_new_' + Math.random().toString(36).substr(2, 5),
+              farmId: myFarmId.value,
+              name: `アソシエイト ${firmMembers.value.length + 1}号`,
+              level: lv,
+              title: TITLES[Math.min(titleIdx, 19)],
+              badge: badges[Math.floor(Math.random() * badges.length)],
+              intro: intros[Math.floor(Math.random() * intros.length)]
+            });
+          }
+          alert(`ファームにダミーメンバーを${count}人追加しました。`);
+        };
+        const firmRoute = ref('chat');
+        const showMemberProfileModal = ref(false);
+        const activeFirmMember = ref(null);
+
+        const openMemberProfile = (m) => {
+          activeFirmMember.value = m;
+          showMemberProfileModal.value = true;
+        };
+
+        const isAlreadyFriend = (id) => {
+          return friendsList.value.some(f => f.id === id);
+        };
+
+        const sendFriendRequest = (m) => {
+          if (!m || isAlreadyFriend(m.id) || requestedFriends.value.includes(m.id)) return;
+          requestedFriends.value.push(m.id);
+        };
+
+        const userSearchQuery = ref('');
+        const searchedUsers = ref([]);
+        const isSearching = ref(false);
+        const hasSearched = ref(false);
+
+        const searchUsers = async () => {
+          const keyword = userSearchQuery.value.trim();
+          if (!keyword) return;
+
+          isSearching.value = true;
+          hasSearched.value = true;
+          searchedUsers.value = [];
+
+          try {
+            const myId = currentUser.value;
+            const { data, error } = await supa
+              .from('user_profiles')
+              .select('id, user_name, level, title, unlocked_badges')
+              .ilike('user_name', `%${keyword}%`)
+              .neq('id', myId)
+              .limit(30);
+
+            if (error) {
+              alert('検索エラー: ' + error.message);
+            } else if (data) {
+              searchedUsers.value = data;
+            }
+          } catch (e) {
+            console.error('ユーザー検索エラー:', e);
+          } finally {
+            isSearching.value = false;
+          }
+        };
+
+        const getDisplayBadge = (badges) => {
+          if (!badges || badges.length === 0) return '🔰 新人';
+          return badges[badges.length - 1] || '🔰 新人';
+        };
+
+        const sendFriendRequestAPI = (user) => {
+          sendFriendRequest(user);
+          alert(`${user.user_name} さんにフレンド申請を送りました！`);
+        };
+
+        const firmChat = ref([]);
+        const firmChatInput = ref('');
+        const sendFirmChat = async () => {
+          if (!canSendChat.value) {
+            showPaywall('チャット送信枠の上限', '無料プランでの送信は1日10回までです。プレミアムに加入しましょう！');
+            return;
+          }
+          const textLength = firmChatInput.value.trim().length;
+          if (textLength === 0 || textLength > 500) {
+            alert('メッセージは1文字以上500文字以内で入力してください。');
+            return;
+          }
+          
+          const content = firmChatInput.value;
+          firmChatInput.value = '';
+            chatCount.value++;
+            
+            // 即時UI反映
+            const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            firmChat.value.push({ 
+              isMe: true, 
+              sender: `[${activeBadge.value}] ${displayName.value}`, 
+              text: content,
+              time: timeStr
+            });
+            setTimeout(() => {
+              const el = document.getElementById('firmChatArea');
+              if(el) el.scrollTop = el.scrollHeight;
+            }, 100);
+
+            const { error } = await supa.from('messages').insert([{
+              room_id: 'farm_room_' + myFarmId.value,
+              user_id: currentUser.value,
+              user_name: displayName.value,
+              avatar_badge: activeBadge.value,
+              content: content
+            }]);
+            if (error) {
+              alert('メッセージ送信に失敗しました: ' + error.message);
+            }
+        };
+
+        const leaveFirm = () => {
+          if (confirm('本当にこのファームを脱退しますか？\n※これまでのファームチャット履歴は見られなくなります。')) {
+            isFarmMember.value = false;
+            firmJoinRoute.value = 'lobby';
+            firmChat.value = [];
+            alert('ファームを脱退しました。');
+          }
+        };
+
+        const firmJoinRoute = ref('lobby');
+        const firmSearchQuery = ref('');
+        const newFirmName = ref('');
+        const newFirmIntro = ref('');
+
+        const DUMMY_FIRMS = [
+          { id: 'f1', name: '財務会計ガチ勢', members: 7, intro: '財務会計を中心にストイックに勉強する集団です。' },
+          { id: 'f2', name: '朝活合格塾', members: 4, intro: '朝5時〜7時メインで活動しています。社会人歓迎！' },
+          { id: 'f3', name: '企業経営理論マスターズ', members: 9, intro: '暗記系科目を徹底的に潰すファーム。あと1名！' },
+          { id: 'f4', name: '週末スパート組', members: 5, intro: '平日は仕事優先、土日でガッツリ稼ぐスタイルです。' },
+          { id: 'f5', name: '初学者応援サロン', members: 8, intro: '今年初受験のメンバー多め。わからない所を教え合います。' }
+        ];
+
+        const filteredDummyFirms = computed(() => {
+          if (!firmSearchQuery.value.trim()) return DUMMY_FIRMS;
+          const q = firmSearchQuery.value.toLowerCase();
+          return DUMMY_FIRMS.filter(f => f.name.toLowerCase().includes(q) || f.intro.toLowerCase().includes(q));
+        });
+
+        const joinFirm = (f) => {
+          isFarmMember.value = true;
+          isFirmOwner.value = false;
+          firmRoute.value = 'chat';
+          firmChat.value.push({ sender: 'システム', text: `🏢 「${f.name}」に加入しました！まずは挨拶してみましょう。` });
+          alert(`「${f.name}」に加入しました！`);
+          const el = document.getElementById('firmChatArea');
+          if(el) setTimeout(() => el.scrollTop = el.scrollHeight, 100);
+        };
+
+        const createFirm = () => {
+          if (!newFirmName.value.trim()) return;
+          isFarmMember.value = true;
+          isFirmOwner.value = true;
+          firmRoute.value = 'chat';
+          
+          if (!unlockedBadges.value.includes('創業者')) {
+            unlockedBadges.value.push('創業者');
+            alert('🎉 ファームを設立しました！記念バッジ【創業者】を獲得！');
+          } else {
+            alert('🎉 ファームを設立しました！');
+          }
+          
+          firmChat.value = [
+            { sender: 'システム', text: `🏢 あなたが「${newFirmName.value}」を設立しました！メンバーを募集してファームを盛り上げましょう！` }
+          ];
+          newFirmName.value = '';
+          newFirmIntro.value = '';
+        };
+        
+        const kickFirmMember = (m) => {
+          if (confirm(`本当に ${m.name} さんをファームから強制脱退させますか？`)) {
+            firmMembers.value = firmMembers.value.filter(member => member.id !== m.id);
+            alert(`${m.name} さんをキックしました。`);
+          }
+        };
+
+        const transferOwnership = (m) => {
+          if (confirm(`本当に ${m.name} さんにファームの設立者権限を移譲しますか？\nあなたの権限は一般メンバーに降格します。`)) {
+            isFirmOwner.value = false;
+            showMemberProfileModal.value = false;
+            activeFirmMember.value = null;
+            alert(`${m.name} さんに設立者権限を移譲しました。`);
+          }
+        };
+        
+        const editDisplayName = () => {
+          const newName = prompt('新しいユーザー名を入力してください (最大12文字)', displayName.value);
+          if (newName !== null) {
+            const trimmed = newName.trim();
+            if (!trimmed) {
+              alert('ユーザー名は空白にできません。');
+              return;
+            }
+            if (trimmed.length > 12) {
+              alert('ユーザー名は12文字以内で入力してください。');
+              return;
+            }
+            displayName.value = trimmed;
+            alert('ユーザー名を変更しました。');
+          }
+        };
+        
+        const saveSelfIntro = () => { alert('自己紹介を保存しました（自動セーブ完了）'); };
+
+        const addDummyFriend = () => {
+          if (!isPremium.value && friendCount.value >= 15) {
+            showPaywall('フレンド枠の上限 (15人)', '無料プランではフレンドを15人までしか追加できません。プレミアムに加入すると拡張されます！');
+            return;
+          }
+          friendCount.value++;
+          alert('フレンドを追加しました！（ダミー）');
+        };
+
+        const addDummyFriendsMode = (count) => {
+          if (!activeMode.value) return;
+          const icons = ['👨', '👩', '👦', '👧', '👨‍🦰', '👩‍🦰', '👱‍♂️', '👱‍♀️', '👴', '👵'];
+          const names = ['佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '山本', '中村', '小林', '加藤'];
+          const badges = ['🔰 新人', '🔥 熱血', '📚 勉強鬼', '🏆 ランカー', '✨ 期待の新星'];
+          for (let i=0; i<count; i++) {
+            const id = 'f_' + Math.random().toString(36).substr(2, 9);
+            const lv = Math.floor(Math.random() * 50) + 1;
+            const titleIdx = Math.floor((lv - 1) / 5);
+            const title = TITLES[Math.min(titleIdx, 19)];
+            friendsList.value.push({
+              id,
+              name: names[Math.floor(Math.random() * names.length)] + 'さん',
+              icon: icons[Math.floor(Math.random() * icons.length)],
+              level: lv,
+              title: title,
+              badge: badges[Math.floor(Math.random() * badges.length)]
+            });
+          }
+          alert(`現在のモードにダミーフレンドを${count}人追加しました。`);
+        };
+
+        const removeFriend = (friend) => {
+          if (confirm(`${friend.name}さんのフレンド登録を解除しますか？\n※これまでのチャット履歴も削除されます。`)) {
+            friendsList.value = friendsList.value.filter(f => f.id !== friend.id);
+            if (directChats.value[friend.id]) {
+              delete directChats.value[friend.id];
+            }
+          }
+        };
+
+        const openDirectChat = (f) => {
+          activeFriend.value = f;
+          friendRoute.value = 'chat';
+          setTimeout(() => {
+            const el = document.getElementById('directChatArea');
+            if (el) el.scrollTop = el.scrollHeight;
+          }, 100);
+        };
+
+        const sendDirectChat = () => {
+          if (!canSendChat.value) {
+            showPaywall('チャット送信枠の上限', '無料プランでの送信は1日10回までです。プレミアムに加入しましょう！');
+            return;
+          }
+          const textLength = directChatInput.value.trim().length;
+          if (textLength === 0 || textLength > 500) {
+            alert('メッセージは1文字以上500文字以内で入力してください。');
+            return;
+          }
+          
+          if (activeFriend.value) {
+            const fid = activeFriend.value.id;
+            if (!directChats.value[fid]) {
+              directChats.value[fid] = [];
+            }
+            directChats.value[fid].push({
+              sender: 'me',
+              text: directChatInput.value,
+              time: getFormattedTime()
+            });
+            chatCount.value++;
+            directChatInput.value = '';
+            
+            setTimeout(() => {
+              const el = document.getElementById('directChatArea');
+              if (el) el.scrollTop = el.scrollHeight;
+            }, 100);
+            
+            // Dummy reply
+            setTimeout(() => {
+              if (directChats.value[fid]) {
+                directChats.value[fid].push({
+                  sender: 'friend',
+                  text: '返信テストです。',
+                  time: getFormattedTime()
+                });
+                setTimeout(() => {
+                  const el = document.getElementById('directChatArea');
+                  if (el) el.scrollTop = el.scrollHeight;
+                }, 100);
+              }
+            }, 2000);
+          }
+        };
+
+        const friendLogs = ref([
+          { icon: '👦', name: 'タカシ (Lv.12)', action: '経済学で500EXP獲得しました', time: '10分前' },
+          { icon: '👩', name: 'Yumi (Lv.25)', action: 'オンラインになりました', time: '1時間前' },
+          { icon: '👨', name: '財務マスター', action: '模試で全国12位にランクインしました！', time: '昨日の 22:00' }
+        ]);
+
+        watch([activeTab, firmRoute], () => {
+          if (activeTab.value === 'firm' && isFarmMember.value && firmRoute.value === 'chat') {
+            firmChat.value = [];
+            subscribeToRoom('farm_room_' + myFarmId.value, firmChat, (msg) => {
+              const timeStr = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+              return { 
+                isMe: msg.user_id === currentUser.value,
+                sender: `[${msg.avatar_badge}] ${msg.user_name}`,
+                text: msg.content,
+                time: timeStr
+              };
+            });
+          }
+        });
+
+        return {
+          authScreen, currentUser, loginUsername, loginPassword, loginError, doLogin, activeMode, selectMode,
+          regUsername, regPassword, regIntro, regError, doRegister, doLogout, resetAllData,
+          agreedToTerms, showTermsModal, showPrivacyModal,
+
+          isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, currentTitle, currentLevel, nextLevelExp, currentLevelStartExp, expProgressPercent,
+          chatCount, canSendChat, dailyCorrect, dailyCombo, unlockedBadges, activeBadge,
+          activeTab, studyRoute, profileTab,
+          loadStatus, isLoading, paywallConfig, showPaywall,
+          
+          userSearchQuery, searchedUsers, isSearching, hasSearched, searchUsers, getDisplayBadge, sendFriendRequestAPI,
+          
+          masteredBlocks, masteredSubjects, showConfetti, celebrationMessage, celebrationTitle,
+          
+          goToStudyRoomLobby, handleFileUpload, setAllTo2,
+          SUBJECTS, STUDY_ROOMS, lobbyActiveTab, expandedSubject, quizSettings, correctCounts,
+          activeRoom, getRoomStatusText, getRoomStatusClass, enterRoomNew, startQuizFlow,
+          quizQueue, currentQuestionIndex, currentQuestion, isFinished, showFeedback, isCorrect, correctCount, handleAnswer, nextQuestion,
+          
+          studyLogs, studyChatInput, sendStudyChat, openStudyUserProfile, editDisplayName,
+          firmMembers, firmChat, firmChatInput, sendFirmChat,
+          
+          selfIntro, saveSelfIntro, friendCount, addDummyFriend, friendLogs,
+          addExp, checkBadges, showLevelUp, levelUpMessage, showBadgeToast, badgeToastMessage,
+
+          showBenefitScreen, showGPlayModal, isProcessingPayment, doGooglePlayPurchase,
+          showInterstitialAd, adCountdown, triggerInterstitial, closeInterstitialAd,
+
+          examCountdownString, isExamLive, startMockExam,
+          examQueue, examCurrentIndex, examCurrentQuestion, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
+
+          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership,
+          firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, filteredDummyFirms, joinFirm, createFirm, leaveFirm,
+          friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat,
+          showBadgeModal, ALL_BADGES, equipBadge
+        };
+      }
+    });
+
+    app.mount('#app');
+  </script>
+</body>
+</html>
