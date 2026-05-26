@@ -1127,6 +1127,10 @@
                   </div>
                   
                   <button class="primary-btn" style="background: var(--text-sub); color: white;" @click="doLogout">ログアウト</button>
+
+                  <div style="margin-top: 40px; text-align: center;">
+                    <button @click="triggerDebugFullClear" style="background: #333; color: #666; border: none; padding: 4px 8px; font-size: 10px; cursor: pointer; border-radius: 4px; opacity: 0.5;">[DEBUG] 全問1回正解化</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2906,7 +2910,7 @@
           
           masteredBlocks, masteredSubjects, showConfetti, celebrationMessage, celebrationTitle,
           
-          goToStudyRoomLobby, setAllTo2,
+          goToStudyRoomLobby, setAllTo2, triggerDebugFullClear,
           SUBJECTS, STUDY_ROOMS, lobbyActiveTab, expandedSubject, quizSettings, correctCounts,
           activeRoom, getRoomStatusText, getRoomStatusClass, enterRoomNew, startQuizFlow,
           quizQueue, currentQuestionIndex, currentQuestion, isFinished, showFeedback, isCorrect, correctCount, handleAnswer, nextQuestion,
