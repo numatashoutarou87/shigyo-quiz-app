@@ -655,7 +655,7 @@
               <div class="progress-bar-container">
                 <div class="progress-bar-fill" :style="{ width: expProgressPercent + '%' }"></div>
               </div>
-              <div style="text-align:right; font-size:10px; color:#aaa; margin-top:4px;">Next Lv: {{ nextLevelExp.toLocaleString() }} EXP</div>
+              <div style="text-align:right; font-size:10px; color:#aaa; margin-top:4px;">Next Lvまで: あと {{ remainingExpToNext.toLocaleString() }} EXP</div>
             </div>
 
             <div class="subject-section">
@@ -1047,7 +1047,7 @@
                     <div class="profile-progress-bar-container">
                       <div class="profile-progress-bar-fill" :style="{ width: expProgressPercent + '%' }"></div>
                     </div>
-                    <div class="profile-next-exp">Next Lv: {{ nextLevelExp.toLocaleString() }} EXP</div>
+                    <div class="profile-next-exp">Next Lvまで: あと {{ remainingExpToNext.toLocaleString() }} EXP</div>
                     
                     <button class="change-badge-btn" @click="showBadgeModal = true">バッジを変更する</button>
                   </div>
@@ -1539,7 +1539,11 @@
         // LEVEL & TITLE LOGIC
         const EXP_TABLE = [];
         for (let i = 1; i <= 100; i++) {
-          EXP_TABLE[i] = Math.round(Math.pow((i - 1) / 99, 3.5) * 1000000);
+          if (i === 1) {
+            EXP_TABLE[i] = 0;
+          } else {
+            EXP_TABLE[i] = Math.round(Math.pow((i - 1) / 99, 2) * 1000000);
+          }
         }
 
         const currentLevel = computed(() => {
@@ -1565,8 +1569,14 @@
         const expProgressPercent = computed(() => {
           if (currentLevel.value >= 100) return 100;
           const range = nextLevelExp.value - currentLevelStartExp.value;
+          if (range <= 0) return 0;
           const current = totalExp.value - currentLevelStartExp.value;
           return Math.min(100, Math.max(0, (current / range) * 100));
+        });
+        
+        const remainingExpToNext = computed(() => {
+          if (currentLevel.value >= 100) return 0;
+          return Math.max(0, nextLevelExp.value - totalExp.value);
         });
 
         const currentTitle = computed(() => {
@@ -1785,7 +1795,7 @@
             currentStudySubjId.value = subjId;
             currentStudyBlockIndex.value = blockIndex;
             const startId = (blockIndex - 1) * 100 + 1;
-            const endId = startId + 99;
+            const endId = blockIndex * 100; // 例: 1〜100, 101〜200
             const blockRange = `${startId}-${endId}`;
             const subjName = SUBJECTS.find(s => s.id === subjId)?.name || '科目';
             
@@ -1806,7 +1816,7 @@
               .select('*')
               .eq('subject', dbSubject)
               .eq('block_range', blockRange)
-              .limit(100);
+              .limit(100); // 確実に100問を取得
 
             if (error) {
               alert('クイズデータの取得に失敗しました: ' + error.message);
@@ -2614,7 +2624,7 @@
           regUsername, regPassword, regIntro, regError, doRegister, doLogout, resetAllData,
           agreedToTerms, showTermsModal, showPrivacyModal,
 
-          isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, currentTitle, currentLevel, nextLevelExp, currentLevelStartExp, expProgressPercent,
+          isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, currentTitle, currentLevel, nextLevelExp, currentLevelStartExp, expProgressPercent, remainingExpToNext,
           chatCount, canSendChat, dailyCorrect, dailyCombo, unlockedBadges, activeBadge, activeBadgeDisplay,
           activeTab, studyRoute, profileTab,
           loadStatus, isLoading, paywallConfig, showPaywall,
