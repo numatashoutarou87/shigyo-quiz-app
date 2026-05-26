@@ -1521,6 +1521,12 @@
               totalExp.value = data.total_exp || 0;
               unlockedBadges.value = data.unlocked_badges || ['🔰 新人'];
               activeBadge.value = data.active_badge || '🔰 新人';
+              
+              if (data.completed_blocks && Array.isArray(data.completed_blocks)) {
+                const loadedMB = {};
+                data.completed_blocks.forEach(key => loadedMB[key] = true);
+                masteredBlocks.value = loadedMB;
+              }
             }
           } catch (e) {
             console.error('Profile sync error:', e);
@@ -1537,7 +1543,8 @@
               total_exp: totalExp.value,
               level: currentLevel.value,
               unlocked_badges: unlockedBadges.value,
-              active_badge: activeBadge.value
+              active_badge: activeBadge.value,
+              completed_blocks: Object.keys(masteredBlocks.value)
             };
             await supa.from('user_profiles').upsert([profile]);
           } catch (e) {
@@ -1552,7 +1559,7 @@
 
 
         // Auto Save Watcher
-        watch([isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, dailyCorrect, dailyCombo, maxCombo, unlockedBadges, activeBadge, selfIntro, friendCount, chatCount, friendsList, directChats, requestedFriends, correctCounts, totalAnswered, consecutiveLogins, totalLogins, examParticipatedCount, likesSentCount], () => {
+        watch([isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, dailyCorrect, dailyCombo, maxCombo, unlockedBadges, activeBadge, selfIntro, friendCount, chatCount, friendsList, directChats, requestedFriends, correctCounts, totalAnswered, consecutiveLogins, totalLogins, examParticipatedCount, likesSentCount, masteredBlocks], () => {
           if (!currentUser.value || !app_users[currentUser.value]) return;
           const u = app_users[currentUser.value];
           u.isPremium = isPremium.value;
@@ -1584,6 +1591,7 @@
             m.directChats = JSON.parse(JSON.stringify(directChats.value));
             m.requestedFriends = JSON.parse(JSON.stringify(requestedFriends.value));
             m.correctCounts = JSON.parse(JSON.stringify(correctCounts.value));
+            m.masteredBlocks = JSON.parse(JSON.stringify(masteredBlocks.value));
           }
           localStorage.setItem('app_users', JSON.stringify(app_users));
         }, { deep: true });
