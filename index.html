@@ -1533,6 +1533,50 @@
           }
         };
 
+        // 過去データスキャンによるマスター状態の自動修復
+        const autoRepairMasteredBlocks = () => {
+          let hasRepaired = false;
+          const subjCodeMap = {
+            'keizai': 100100000,
+            'zaimu': 100200000,
+            'kigyou': 100300000,
+            'unei': 100400000,
+            'houmu': 100500000,
+            'jouhou': 100600000,
+            'chusho': 100700000
+          };
+          
+          for (let s of SUBJECTS) {
+            const baseCode = subjCodeMap[s.id];
+            if (!baseCode) continue;
+            
+            for (let b = 1; b <= 10; b++) {
+              const blockKey = `${s.id}_${b}`;
+              if (masteredBlocks.value[blockKey]) continue; // 既にマスター済みならスキップ
+              
+              let allMastered = true;
+              const startId = baseCode + ((b - 1) * 100) + 1;
+              const endId = baseCode + (b * 100);
+              
+              for (let qid = startId; qid <= endId; qid++) {
+                if ((correctCounts.value[qid] || 0) < 3) {
+                  allMastered = false;
+                  break;
+                }
+              }
+              
+              if (allMastered) {
+                masteredBlocks.value[blockKey] = true;
+                hasRepaired = true;
+              }
+            }
+          }
+          
+          if (hasRepaired) {
+            saveUserProfile(); // 自動でSupabaseに最新のコンプリートリストを永続化
+          }
+        };
+
         const saveUserProfile = async () => {
           if (!currentUser.value) return;
           try {
@@ -1806,6 +1850,8 @@
           
           loadGlobalData();
           await syncUserProfile(currentUser.value);
+          autoRepairMasteredBlocks(); // 初期ロード時に全7000問の進捗をスキャン＆救済
+          
           activeMode.value = null;
           authScreen.value = 'app';
         };
