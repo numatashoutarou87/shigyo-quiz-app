@@ -1605,30 +1605,53 @@
             'chusho': 100700000
           };
           
+          let masteredSubjectsCount = 0;
+          
           for (let s of SUBJECTS) {
             const baseCode = subjCodeMap[s.id];
             if (!baseCode) continue;
             
+            let subjectMastered = true;
             for (let b = 1; b <= 10; b++) {
               const blockKey = `${s.id}_${b}`;
-              if (masteredBlocks.value[blockKey]) continue; // 既にマスター済みならスキップ
-              
-              let allMastered = true;
-              const startId = baseCode + ((b - 1) * 100) + 1;
-              const endId = baseCode + (b * 100);
-              
-              for (let qid = startId; qid <= endId; qid++) {
-                if ((correctCounts.value[qid] || 0) < 3) {
-                  allMastered = false;
-                  break;
+              if (!masteredBlocks.value[blockKey]) {
+                let allMastered = true;
+                const startId = baseCode + ((b - 1) * 100) + 1;
+                const endId = baseCode + (b * 100);
+                
+                for (let qid = startId; qid <= endId; qid++) {
+                  if ((correctCounts.value[qid] || 0) < 3) {
+                    allMastered = false;
+                    break;
+                  }
+                }
+                
+                if (allMastered) {
+                  masteredBlocks.value[blockKey] = true;
+                  hasRepaired = true;
                 }
               }
-              
-              if (allMastered) {
-                masteredBlocks.value[blockKey] = true;
-                hasRepaired = true;
+              if (!masteredBlocks.value[blockKey]) {
+                subjectMastered = false;
               }
             }
+            
+            if (subjectMastered) {
+              if (!masteredSubjects.value[s.id]) {
+                masteredSubjects.value[s.id] = true;
+                hasRepaired = true;
+                const badgeMap = {
+                  'keizai': 'badge_quiz_06', 'zaimu': 'badge_quiz_07', 'kigyou': 'badge_quiz_08',
+                  'unei': 'badge_quiz_09', 'houmu': 'badge_quiz_10', 'jouhou': 'badge_quiz_11', 'chusho': 'badge_quiz_12'
+                };
+                if (badgeMap[s.id]) checkAndUnlockBadge(badgeMap[s.id]);
+              }
+              masteredSubjectsCount++;
+            }
+          }
+          
+          if (masteredSubjectsCount === 7) {
+            checkAndUnlockBadge('badge_quiz_13');
           }
           
           if (hasRepaired) {
@@ -2018,30 +2041,36 @@
         };
 
         const triggerDebugFullClear = () => {
-          if (!confirm('【警告】全7,000問を「1回正解」の状態に上書きします。\nよろしいですか？')) return;
+          if (!confirm('【警告】全7,000問の正解回数を「+1」します。\nよろしいですか？')) return;
           
           isLoading.value = true;
           loadStatus.value = `デバッグ: 全問クリア処理中...`;
           
           setTimeout(() => {
+            const subjCodeMap = {
+              'keizai': 100100000, 'zaimu': 100200000, 'kigyou': 100300000,
+              'unei': 100400000, 'houmu': 100500000, 'jouhou': 100600000, 'chusho': 100700000
+            };
             const newCounts = {};
-            for(let subj = 1; subj <= 7; subj++) {
-              let baseCode = subj * 10000;
+            let clickStage = 0;
+            
+            for (let s of Object.values(subjCodeMap)) {
               for(let q = 1; q <= 1000; q++) {
-                newCounts[baseCode + q] = Math.max((correctCounts.value[baseCode + q] || 0), 1);
+                const current = correctCounts.value[s + q] || 0;
+                newCounts[s + q] = Math.min(current + 1, 3);
+                if (q === 1 && s === 100100000) clickStage = newCounts[s + q];
               }
             }
             correctCounts.value = { ...correctCounts.value, ...newCounts };
             
             totalAnswered.value = Math.max(totalAnswered.value, 7000);
-            checkAndUnlockBadge('badge_study_04');
-            checkAndUnlockBadge('badge_study_05');
-            checkAndUnlockBadge('badge_study_06');
+            checkAndUnlockBadge('badge_quiz_02'); // 1,000問
+            checkAndUnlockBadge('badge_quiz_03'); // 5,000問
             
             saveUserProfile();
             
             isLoading.value = false;
-            alert('デバッグ処理完了！全7,000問の正解回数を1に底上げしました。\n進捗同期のため画面をリロードします。');
+            alert(`デバッグ処理完了！全7,000問の正解回数を「${clickStage}」に更新しました。\n進捗同期とマスター判定のため画面をリロードします。`);
             window.location.reload();
           }, 100);
         };
