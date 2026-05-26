@@ -2375,11 +2375,10 @@
           if (activeRoom.value?.type === 'silent') {
             const action = studyActions[Math.floor(Math.random() * studyActions.length)];
             studyLogs.value.push({ time: getFormattedTime(), user: u, action: action, type: 'silent' });
+            if(studyLogs.value.length > 30) studyLogs.value.shift();
+            const el = document.getElementById('studyLogs');
+            if(el) setTimeout(() => el.scrollTop = el.scrollHeight, 100);
           }
-          
-          if(studyLogs.value.length > 30) studyLogs.value.shift();
-          const el = document.getElementById('studyLogs');
-          if(el) setTimeout(() => el.scrollTop = el.scrollHeight, 100);
         };
 
         const openStudyUserProfile = (u) => {
@@ -2461,6 +2460,7 @@
                 if (payload.eventType === 'INSERT') {
                   if (payload.new.user_id !== currentUser.value) {
                     targetArrayRef.value.push(formatMessage(payload.new));
+                    if (targetArrayRef.value.length > 50) targetArrayRef.value.shift();
                     setTimeout(() => {
                       const els = document.querySelectorAll('.firm-chat-timeline, .timeline-logs');
                       els.forEach(el => el.scrollTop = el.scrollHeight);
@@ -2493,6 +2493,7 @@
             const tempId = 'temp_' + Date.now();
             const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             studyLogs.value.push({ id: tempId, time: timeStr, text: `<strong style="color:var(--accent-gold);">[${activeBadgeDisplay.value}] ${displayName.value}:</strong> ${content}`, reactions: {} });
+            if (studyLogs.value.length > 50) studyLogs.value.shift();
             setTimeout(() => {
               const el = document.getElementById('studyLogs');
               if(el) el.scrollTop = el.scrollHeight;
@@ -2647,6 +2648,7 @@
               time: timeStr,
               reactions: {}
             });
+            if (firmChat.value.length > 50) firmChat.value.shift();
             setTimeout(() => {
               const el = document.getElementById('firmChatArea');
               if(el) el.scrollTop = el.scrollHeight;
