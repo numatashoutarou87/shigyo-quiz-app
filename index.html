@@ -1794,9 +1794,9 @@
           try {
             currentStudySubjId.value = subjId;
             currentStudyBlockIndex.value = blockIndex;
-            const startId = (blockIndex - 1) * 100 + 1;
-            const endId = blockIndex * 100; // 例: 1〜100, 101〜200
-            const blockRange = `${startId}-${endId}`;
+            const startIdx = (blockIndex - 1) * 100;
+            const endIdx = startIdx + 99; // 0-indexed for Supabase range, inclusive (100 items)
+            
             const subjName = SUBJECTS.find(s => s.id === subjId)?.name || '科目';
             
             // CSVインポート時の名前に合わせるためのマッピング
@@ -1815,15 +1815,15 @@
               .from('quizzes')
               .select('*')
               .eq('subject', dbSubject)
-              .eq('block_range', blockRange)
-              .limit(100); // 確実に100問を取得
+              .order('id', { ascending: true })
+              .range(startIdx, endIdx); // 確実に100問を取得
 
             if (error) {
               alert('クイズデータの取得に失敗しました: ' + error.message);
               return;
             }
             if (!data || data.length === 0) {
-              alert(`「${subjName}」のブロック ${blockRange} はまだ登録されていません。`);
+              alert(`「${subjName}」のブロック ${blockIndex} はまだ登録されていません。`);
               return;
             }
 
