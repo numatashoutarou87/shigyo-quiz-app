@@ -2419,6 +2419,24 @@
           }
         };
 
+        const cleanupOldMessages = async (roomId) => {
+          try {
+            const { data, error } = await supa.from('messages')
+              .select('id')
+              .eq('room_id', roomId)
+              .order('created_at', { ascending: false });
+            
+            if (data && data.length > 50) {
+              const idsToDelete = data.slice(50).map(m => m.id);
+              if (idsToDelete.length > 0) {
+                await supa.from('messages').delete().in('id', idsToDelete);
+              }
+            }
+          } catch (e) {
+            console.error('Cleanup error:', e);
+          }
+        };
+
         const subscribeToRoom = async (roomId, targetArrayRef, formatMessage) => {
           if (currentChatChannel) {
             await currentChatChannel.unsubscribe();
@@ -2426,12 +2444,12 @@
             currentChatChannel = null;
           }
           try {
-            const { data: history, error } = await supa.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: true }).limit(50);
+            const { data: history, error } = await supa.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: false }).limit(50);
             if (error) {
               console.error('History fetch error:', error);
             }
             if (history) {
-              targetArrayRef.value = history.map(formatMessage);
+              targetArrayRef.value = history.reverse().map(formatMessage);
               setTimeout(() => {
                 const els = document.querySelectorAll('.firm-chat-timeline, .timeline-logs');
                 els.forEach(el => el.scrollTop = el.scrollHeight);
@@ -2495,6 +2513,7 @@
               // テンポラリIDを正式なIDに置換
               const msgObj = studyLogs.value.find(m => m.id === tempId);
               if (msgObj) msgObj.id = data.id;
+              cleanupOldMessages(currentRoomId);
             }
           }
         };
@@ -2646,6 +2665,7 @@
             } else if (data) {
               const msgObj = firmChat.value.find(m => m.id === tempId);
               if (msgObj) msgObj.id = data.id;
+              cleanupOldMessages('farm_room_' + myFarmId.value);
             }
         };
 
@@ -2815,6 +2835,9 @@
               time: getFormattedTime(),
               reactions: {}
             });
+            if (directChats.value[fid].length > 50) {
+              directChats.value[fid] = directChats.value[fid].slice(-50);
+            }
             chatCount.value++;
             directChatInput.value = '';
             
@@ -2832,6 +2855,9 @@
                   time: getFormattedTime(),
                   reactions: {}
                 });
+                if (directChats.value[fid].length > 50) {
+                  directChats.value[fid] = directChats.value[fid].slice(-50);
+                }
                 setTimeout(() => {
                   const el = document.getElementById('directChatArea');
                   if (el) el.scrollTop = el.scrollHeight;
