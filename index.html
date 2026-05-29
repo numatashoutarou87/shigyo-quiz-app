@@ -2528,6 +2528,10 @@
           const keyword = userSearchQuery.value.trim();
           if (!keyword) return;
 
+          const { data: { user } } = await supa.auth.getUser();
+          const myId = user ? user.id : null;
+          if (!myId) return;
+
           isSearching.value = true;
           hasSearched.value = true;
           searchedUsers.value = [];
@@ -2536,21 +2540,22 @@
             const { data, error } = await supa
               .from('user_profiles')
               .select('*')
-              .ilike('user_name', `%${keyword}%`);
+              .ilike('user_name', `%${keyword}%`)
+              .neq('id', myId);
 
             if (error) {
               console.error("ユーザー検索エラー詳細:", error);
             } else if (data) {
               const userIds = data.map(u => u.id);
-              if (userIds.length > 0 && currentUser.value) {
+              if (userIds.length > 0) {
                 const { data: rels } = await supa
                   .from('friendships')
                   .select('receiver_id, sender_id, status')
-                  .or(`sender_id.eq.${currentUser.value},receiver_id.eq.${currentUser.value}`);
+                  .or(`sender_id.eq.${myId},receiver_id.eq.${myId}`);
                 
                 if (rels && rels.length > 0) {
                   rels.forEach(r => {
-                    const otherId = r.sender_id === currentUser.value ? r.receiver_id : r.sender_id;
+                    const otherId = r.sender_id === myId ? r.receiver_id : r.sender_id;
                     if (!requestedFriends.value.includes(otherId)) {
                       requestedFriends.value.push(otherId);
                     }
@@ -2574,13 +2579,16 @@
         };
 
         const loadFriendsList = async () => {
-          if (!currentUser.value) return;
+          const { data: { user } } = await supa.auth.getUser();
+          const myId = user ? user.id : null;
+          if (!myId) return;
+
           try {
             const { data, error } = await supa
               .from('friendships')
               .select('*')
               .eq('status', 'accepted')
-              .or(`sender_id.eq.${currentUser.value},receiver_id.eq.${currentUser.value}`);
+              .or(`sender_id.eq.${myId},receiver_id.eq.${myId}`);
             
             if (error) {
               console.error('フレンド一覧ロードエラー:', error.message);
@@ -2589,7 +2597,7 @@
             
             if (data && data.length > 0) {
               // 自分がsenderならreceiverを、自分がreceiverならsenderを抽出
-              const opponentIds = data.map(f => f.sender_id === currentUser.value ? f.receiver_id : f.sender_id);
+              const opponentIds = data.map(f => f.sender_id === myId ? f.receiver_id : f.sender_id);
               
               const { data: profiles, error: pError } = await supa
                 .from('user_profiles')
@@ -2617,12 +2625,15 @@
         const pendingRequests = ref([]);
         
         const loadPendingRequests = async () => {
-          if (!currentUser.value) return;
+          const { data: { user } } = await supa.auth.getUser();
+          const myId = user ? user.id : null;
+          if (!myId) return;
+
           try {
             const { data, error } = await supa
               .from('friendships')
               .select('*')
-              .eq('receiver_id', currentUser.value)
+              .eq('receiver_id', myId)
               .eq('status', 'pending');
               
             if (error) {
@@ -2688,12 +2699,15 @@
         };
 
         const sendFriendRequestAPI = async (user) => {
-          if (!currentUser.value) return;
+          const { data: { user: authUser } } = await supa.auth.getUser();
+          const myId = authUser ? authUser.id : null;
+          if (!myId) return;
+
           try {
             const { error } = await supa
               .from('friendships')
               .insert([{
-                sender_id: currentUser.value,
+                sender_id: myId,
                 receiver_id: user.id,
                 status: 'pending'
               }]);
