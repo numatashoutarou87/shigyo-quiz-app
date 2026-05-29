@@ -1698,22 +1698,23 @@
               total_exp: totalExp.value,
               level: currentLevel.value,
               unlocked_badges: unlockedBadges.value,
-              active_badge: activeBadge.value,
+              // active_badge: activeBadge.value, // 意図的除外: Supabase側スキーマエラー回避のための安全策
               completed_blocks: Object.keys(masteredBlocks.value)
             };
             const { data, error } = await supa.from('user_profiles').upsert([profile]);
             
             if (showDebugAlert) {
               if (error) {
+                console.error("【プロフ作成エラー詳細】:", error);
                 alert(`【プロフ作成エラー】原因: ${error.message}\n詳細: ${error.details || JSON.stringify(error)}`);
               } else {
                 alert(`【プロフ作成成功】データベースに正常に登録されました！`);
               }
             } else if (error) {
-              console.error('Profile upsert error:', error);
+              console.error('Profile upsert error:', error.message, error.details);
             }
           } catch (e) {
-            console.error('Profile save error:', e);
+            console.error('Profile save exception:', e);
             if (showDebugAlert) alert(`【プロフ保存例外エラー】\n${e.message}`);
           }
         };
