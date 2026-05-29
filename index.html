@@ -196,12 +196,12 @@
     .member-item { background: #f0f0f0; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; color: var(--text-main); }
     .firm-chat-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
     .chat-title { font-size: 13px; color: var(--primary-navy); padding: 10px 16px; background: #e9ecef; }
-    .firm-chat-timeline { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .firm-chat-timeline { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
     .firm-msg { max-width: 80%; background: white; padding: 10px; border-radius: 12px; border-top-left-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); animation: fade-in 0.2s; }
     .my-msg { align-self: flex-end; background: var(--primary-navy); color: white; border-top-left-radius: 12px; border-top-right-radius: 2px; }
     .system-msg { align-self: center; background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; border-radius: 8px; font-weight: bold; max-width: 90%; text-align: center; font-size: 12px; }
     .firm-msg-sender { font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
-    .firm-msg-text { font-size: 14px; }
+    .firm-msg-text { font-size: 14px; word-break: break-all; overflow-wrap: break-word; }
 
     /* PROFILE & BADGES */
     .profile-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-light); }
@@ -816,7 +816,7 @@
                     <div class="log-item" v-for="(log, i) in studyLogs" :key="i">
                       <span class="log-time">{{ log.time }}</span>
                       <template v-if="log.user">
-                        <strong @click="openStudyUserProfile(log.user)" style="cursor:pointer; text-decoration:underline; color:var(--primary-navy);">{{ log.user.name }}</strong>
+                        <strong @click="openStudyUserProfile(log.user)" style="cursor:pointer; text-decoration:underline; color:var(--accent-gold);">{{ log.user.name }}</strong>
                         <span v-if="log.type === 'silent'"> {{ log.action }}</span>
                         <span v-else>: {{ log.message }}</span>
                       </template>
@@ -981,11 +981,11 @@
                 <div style="padding: 15px; flex: 1; overflow-y: auto;">
                   <input type="text" v-model="firmSearchQuery" placeholder="ファーム名・キーワードで検索..." class="auth-input" style="margin-bottom: 15px;">
                   <div class="friend-list">
-                    <div class="friend-item" v-for="f in filteredDummyFirms" :key="f.id" style="align-items:flex-start;">
+                    <div class="friend-item" v-for="f in farmsList" :key="f.id" style="align-items:flex-start;">
                       <div class="friend-icon" style="font-size: 24px; margin-right: 10px;">🏢</div>
                       <div class="friend-info" style="flex: 1;">
-                        <div class="friend-name" style="font-size: 14px; margin-bottom: 4px; color: var(--primary-navy);">{{ f.name }} <span style="font-size:11px; color:#888; font-weight:normal;">({{ f.members }}/10人)</span></div>
-                        <div class="friend-level" style="color: #666; font-size: 11px; line-height: 1.4;">{{ f.intro }}</div>
+                        <div class="friend-name" style="font-size: 14px; margin-bottom: 4px; color: var(--primary-navy);">{{ f.name }} <span style="font-size:11px; color:#888; font-weight:normal;">({{ f.members || 1 }}/10人)</span></div>
+                        <div class="friend-level" style="color: #666; font-size: 11px; line-height: 1.4;">{{ f.description || f.intro }}</div>
                       </div>
                       <button class="primary-btn" @click="joinFirm(f)" style="padding: 6px 12px; font-size: 11px; width: auto;">加入</button>
                     </div>
@@ -2303,7 +2303,13 @@
             const targetRoomId = 'study_room_' + room.id;
             subscribeToRoom(targetRoomId, studyLogs, (msg) => {
               const timeStr = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-              return { id: msg.id, time: timeStr, text: `<strong style="color:var(--accent-gold);">[${msg.avatar_badge}] ${msg.user_name}:</strong> ${msg.content}`, reactions: msg.reactions || {} };
+              return { 
+                id: msg.id, 
+                time: timeStr, 
+                user: { id: msg.user_id, name: `[${msg.avatar_badge || '🔰'}] ${msg.user_name}` }, 
+                message: msg.content, 
+                reactions: msg.reactions || {} 
+              };
             });
           }
           startQuizFlow();
@@ -2827,6 +2833,49 @@
         };
 
         const studyLogs = ref([]);
+        const farmsList = ref([]);
+
+        const loadInitialFarms = async () => {
+          try {
+            const { data, error } = await supa
+              .from('farms')
+              .select('*')
+              .order('created_at', { ascending: false });
+            if (data && !error) {
+              farmsList.value = data;
+            }
+          } catch (e) {
+            console.error('ファーム取得エラー:', e);
+          }
+        };
+
+        const searchFarms = async () => {
+          const keyword = firmSearchQuery.value.trim();
+          if (!keyword) {
+            await loadInitialFarms();
+            return;
+          }
+          try {
+            const { data, error } = await supa
+              .from('farms')
+              .select('*')
+              .or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%`)
+              .order('created_at', { ascending: false });
+            if (data && !error) {
+              farmsList.value = data;
+            }
+          } catch (e) {
+            console.error('ファーム検索エラー:', e);
+          }
+        };
+
+        watch(firmSearchQuery, () => {
+          searchFarms();
+        });
+
+        // 初期ロード
+        loadInitialFarms();
+
         const DUMMY_STUDY_USERS = [
           { id: 'su_1', farmId: 'other_farm', name: 'アソシエイトA', level: 12, title: 'アソシエイト', badge: '🔰 新人', intro: 'よろしくお願いします！' },
           { id: 'su_2', farmId: 'other_farm', name: '財務の鬼', level: 25, title: 'シニア・アソシエイト', badge: '🔥 熱血', intro: '財務特化型です。' },
@@ -2851,9 +2900,35 @@
           }
         };
 
-        const openStudyUserProfile = (u) => {
-          activeFirmMember.value = u;
-          showMemberProfileModal.value = true;
+        const openStudyUserProfile = async (u) => {
+          if (!u || !u.id) return;
+          try {
+            // Supabaseから最新のプロフィール情報を取得
+            const { data, error } = await supa.from('user_profiles').select('*').eq('id', u.id).single();
+            if (data) {
+              activeFirmMember.value = {
+                id: data.id,
+                name: data.user_name,
+                level: data.level || 1,
+                title: data.title || 'アソシエイト',
+                badge: data.badge || '🔰',
+                intro: data.intro || 'よろしくお願いします。'
+              };
+            } else {
+              // 取得失敗時は最低限のデータを使用
+              activeFirmMember.value = {
+                id: u.id,
+                name: u.name,
+                level: 1,
+                title: 'アソシエイト',
+                badge: '🔰',
+                intro: 'プロフィールが未設定です。'
+              };
+            }
+            showMemberProfileModal.value = true;
+          } catch(e) {
+            console.error('プロフィール取得エラー:', e);
+          }
         };
 
         const canSendChat = computed(() => isPremium.value || chatCount.value < 10);
@@ -2935,7 +3010,13 @@
             // 即時UI反映
             const tempId = 'temp_' + Date.now();
             const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            studyLogs.value.push({ id: tempId, time: timeStr, text: `<strong style="color:var(--accent-gold);">[${activeBadgeDisplay.value}] ${displayName.value}:</strong> ${content}`, reactions: {} });
+            studyLogs.value.push({ 
+              id: tempId, 
+              time: timeStr, 
+              user: { id: currentUser.value, name: `[${activeBadgeDisplay.value}] ${displayName.value}` }, 
+              message: content, 
+              reactions: {} 
+            });
             if (studyLogs.value.length > 50) studyLogs.value.shift();
             setTimeout(() => {
               const el = document.getElementById('studyLogs');
@@ -3090,19 +3171,7 @@
         const newFirmName = ref('');
         const newFirmIntro = ref('');
 
-        const DUMMY_FIRMS = [
-          { id: 'f1', name: '財務会計ガチ勢', members: 7, intro: '財務会計を中心にストイックに勉強する集団です。' },
-          { id: 'f2', name: '朝活合格塾', members: 4, intro: '朝5時〜7時メインで活動しています。社会人歓迎！' },
-          { id: 'f3', name: '企業経営理論マスターズ', members: 9, intro: '暗記系科目を徹底的に潰すファーム。あと1名！' },
-          { id: 'f4', name: '週末スパート組', members: 5, intro: '平日は仕事優先、土日でガッツリ稼ぐスタイルです。' },
-          { id: 'f5', name: '初学者応援サロン', members: 8, intro: '今年初受験のメンバー多め。わからない所を教え合います。' }
-        ];
 
-        const filteredDummyFirms = computed(() => {
-          if (!firmSearchQuery.value.trim()) return DUMMY_FIRMS;
-          const q = firmSearchQuery.value.toLowerCase();
-          return DUMMY_FIRMS.filter(f => f.name.toLowerCase().includes(q) || f.intro.toLowerCase().includes(q));
-        });
 
         const joinFirm = (f) => {
           isFarmMember.value = true;
@@ -3428,7 +3497,7 @@
           examQueue, examCurrentIndex, examCurrentQuestion, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
           firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership,
-          firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, filteredDummyFirms, joinFirm, createFirm, leaveFirm,
+          firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm,
           friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge
         };
