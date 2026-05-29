@@ -885,8 +885,8 @@
                       <div class="friend-level">Lv.{{ req.sender_profile?.level || 1 }} ・ {{ req.sender_profile?.title || 'アソシエイト' }}</div>
                     </div>
                     <div style="display:flex; gap: 5px;">
-                      <button class="primary-btn" @click="acceptFriendRequest(req.id)" style="padding: 6px 10px; font-size: 11px; width: auto; background: var(--accent-gold);">承認</button>
-                      <button class="secondary-btn" @click="rejectFriendRequest(req.id)" style="padding: 6px 10px; font-size: 11px; width: auto; background: #666; border: none; color: white;">拒否</button>
+                      <button @click="acceptFriendRequest(req.id)" style="padding: 6px 12px; font-size: 12px; width: auto; min-width: 60px; background: var(--accent-gold); color: #fff; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap;">承認</button>
+                      <button @click="rejectFriendRequest(req.id)" style="padding: 6px 12px; font-size: 12px; width: auto; min-width: 60px; background: #666; color: #fff; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap;">拒否</button>
                     </div>
                   </div>
                 </div>
@@ -1309,6 +1309,7 @@
             // 既存セッション（自動ログイン）時にも強制upsertしてプロフィールを確実化
             saveUserProfile(true);
             await loadPendingRequests();
+            await loadFriendsList();
             authScreen.value = 'app';
           }
         });
@@ -1962,6 +1963,7 @@
           // 新規ユーザー対策：ログイン直後にプロフィールを強制upsertして検索可能にする
           saveUserProfile(true);
           await loadPendingRequests();
+          await loadFriendsList();
           
           activeMode.value = null;
           authScreen.value = 'app';
@@ -2014,6 +2016,7 @@
           // 新規ユーザー対策：登録直後にプロフィールを強制upsertして検索可能にする
           saveUserProfile(true);
           await loadPendingRequests();
+          await loadFriendsList();
           
           activeMode.value = null;
           authScreen.value = 'app';
@@ -2543,7 +2546,50 @@
 
         const getDisplayBadge = (badges) => {
           if (!badges || badges.length === 0) return '🔰 新人';
-          return badges[badges.length - 1] || '🔰 新人';
+          const badgeId = badges[badges.length - 1];
+          const b = ALL_BADGES.find(x => x.id === badgeId);
+          return b ? `${b.icon} ${b.name}` : '🔰 新人';
+        };
+
+        const loadFriendsList = async () => {
+          if (!currentUser.value) return;
+          try {
+            const { data, error } = await supa
+              .from('friendships')
+              .select('*')
+              .eq('status', 'accepted')
+              .or(`sender_id.eq.${currentUser.value},receiver_id.eq.${currentUser.value}`);
+            
+            if (error) {
+              console.error('フレンド一覧ロードエラー:', error.message);
+              return;
+            }
+            
+            if (data && data.length > 0) {
+              // 自分がsenderならreceiverを、自分がreceiverならsenderを抽出
+              const opponentIds = data.map(f => f.sender_id === currentUser.value ? f.receiver_id : f.sender_id);
+              
+              const { data: profiles, error: pError } = await supa
+                .from('user_profiles')
+                .select('*')
+                .in('id', opponentIds);
+                
+              if (!pError && profiles) {
+                friendsList.value = profiles.map(p => ({
+                  id: p.id,
+                  name: p.user_name || '不明なユーザー',
+                  icon: '👤',
+                  level: p.level || 1,
+                  title: p.title || 'アソシエイト',
+                  unlocked_badges: p.unlocked_badges || []
+                }));
+                return;
+              }
+            }
+            friendsList.value = [];
+          } catch (e) {
+            console.error('フレンド一覧例外:', e);
+          }
         };
 
         const pendingRequests = ref([]);
@@ -2594,6 +2640,7 @@
             } else {
               alert('フレンドになりました！');
               await loadPendingRequests();
+              await loadFriendsList();
             }
           } catch (e) {
             console.error('承認処理例外:', e);
@@ -2611,6 +2658,7 @@
               alert('拒否エラー: ' + error.message);
             } else {
               await loadPendingRequests();
+              await loadFriendsList();
             }
           } catch (e) {
             console.error('拒否処理例外:', e);
