@@ -353,16 +353,6 @@
     .auth-btn:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; transform: none; }
     
     /* Reaction Styles */
-    .msg-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-    .reaction-badge { font-size: 11px; padding: 2px 6px; border-radius: 12px; background: rgba(0,0,0,0.05); cursor: pointer; border: 1px solid transparent; transition: 0.2s; display: flex; align-items: center; gap: 3px; color: #555; }
-    .reaction-badge:hover { background: rgba(0,0,0,0.1); }
-    .reaction-badge.my-reaction { background: rgba(15, 157, 88, 0.1); border-color: rgba(15, 157, 88, 0.3); color: var(--primary-green); font-weight: bold; }
-    .reaction-add-btn { font-size: 11px; padding: 2px 6px; border-radius: 12px; background: transparent; cursor: pointer; border: 1px dashed #ccc; color: #888; transition: 0.2s; position: relative; }
-    .reaction-add-btn:hover { background: #eee; border-color: #aaa; color: #555; }
-    .reaction-popover { position: absolute; bottom: 100%; left: 0; margin-bottom: 5px; background: white; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); padding: 6px 10px; display: flex; gap: 10px; z-index: 100; animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); white-space: nowrap; }
-    .reaction-popover span { font-size: 18px; cursor: pointer; transition: transform 0.2s; }
-    .reaction-popover span:hover { transform: scale(1.3); }
-    @keyframes popIn { from { opacity: 0; transform: translateY(10px) scale(0.8); } to { opacity: 1; transform: translateY(0) scale(1); } }
   </style>
 </head>
 <body>
@@ -833,19 +823,6 @@
                       <template v-else>
                         <span v-html="log.text"></span>
                         
-                        <div class="msg-reactions" v-if="log.reactions">
-                          <span v-for="(users, emoji) in log.reactions" :key="emoji" 
-                                class="reaction-badge" :class="{'my-reaction': users.includes(currentUser)}"
-                                @click="toggleReaction(log, emoji, false)">
-                            {{ emoji }} {{ users.length }}
-                          </span>
-                          <button class="reaction-add-btn" @click.stop="showReactionPopup = log.id || 'sl_'+i">
-                            ＋
-                            <div class="reaction-popover" v-if="showReactionPopup === (log.id || 'sl_'+i)">
-                              <span v-for="st in STAMPS" :key="st" @click.stop="toggleReaction(log, st, false)">{{ st }}</span>
-                            </div>
-                          </button>
-                        </div>
                       </template>
                     </div>
                   </div>
@@ -973,20 +950,6 @@
                 <div class="firm-msg" v-for="(m, i) in (directChats[activeFriend?.id] || [])" :key="i" :class="{'my-msg': m.sender === 'me', 'system-msg': false}">
                   <div class="firm-msg-text">{{ m.text }}</div>
                   <div style="font-size: 9px; color: #888; margin-top: 4px; text-align: right;">{{ m.time }}</div>
-                  
-                  <div class="msg-reactions" v-if="m.reactions" :style="m.sender === 'me' ? 'justify-content: flex-end;' : ''">
-                    <span v-for="(users, emoji) in m.reactions" :key="emoji" 
-                          class="reaction-badge" :class="{'my-reaction': users.includes(currentUser)}"
-                          @click="toggleReaction(m, emoji, 'friend_messages')">
-                      {{ emoji }} {{ users.length }}
-                    </span>
-                    <button class="reaction-add-btn" @click.stop="showReactionPopup = m.id">
-                      ＋
-                      <div class="reaction-popover" v-if="showReactionPopup === m.id" :style="m.sender === 'me' ? 'right: 0; left: auto;' : 'left: 0; right: auto;'">
-                        <span v-for="st in STAMPS" :key="st" @click.stop="toggleReaction(m, st, 'friend_messages')">{{ st }}</span>
-                      </div>
-                    </button>
-                  </div>
                 </div>
               </div>
               <div class="chat-input-area" style="margin-top: 15px;">
@@ -1066,20 +1029,6 @@
                   <div class="firm-msg" v-for="(m, i) in firmChat" :key="i" :class="{'my-msg': m.isMe || m.sender.includes('あなた') || m.sender.includes(displayName), 'system-msg': m.sender === 'システム'}">
                     <div class="firm-msg-sender" v-if="m.sender !== 'システム'">{{ m.sender }}</div>
                     <div class="firm-msg-text">{{ m.text }}</div>
-                    
-                    <div class="msg-reactions" v-if="m.reactions && m.sender !== 'システム'" :style="m.isMe ? 'justify-content: flex-end;' : ''">
-                      <span v-for="(users, emoji) in m.reactions" :key="emoji" 
-                            class="reaction-badge" :class="{'my-reaction': users.includes(currentUser)}"
-                            @click="toggleReaction(m, emoji, false)">
-                        {{ emoji }} {{ users.length }}
-                      </span>
-                      <button class="reaction-add-btn" @click.stop="showReactionPopup = m.id || i">
-                        ＋
-                        <div class="reaction-popover" v-if="showReactionPopup === (m.id || i)" :style="m.isMe ? 'right: 0; left: auto;' : 'left: 0; right: auto;'">
-                          <span v-for="st in STAMPS" :key="st" @click.stop="toggleReaction(m, st, false)">{{ st }}</span>
-                        </div>
-                      </button>
-                    </div>
                   </div>
                 </div>
                 <div class="chat-input-area">
@@ -2742,8 +2691,7 @@
                  id: msg.id,
                  sender: 'friend',
                  text: msg.message,
-                 time: timeStr,
-                 reactions: {}
+                 time: timeStr
                });
                
                // チャット画面を開いている場合は自動スクロール
@@ -2767,39 +2715,13 @@
                    id: msg.id,
                    sender: 'me',
                    text: msg.message,
-                   time: timeStr,
-                   reactions: {}
+                   time: timeStr
                  });
                  if (activeFriend.value && activeFriend.value.id === fid && friendRoute.value === 'chat') {
                    setTimeout(() => {
                      const el = document.getElementById('directChatArea');
                      if (el) el.scrollTop = el.scrollHeight;
                    }, 100);
-                 }
-               }
-            })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friend_messages', filter: `receiver_id=eq.${user.id}` }, payload => {
-               // 相手がリアクションを付けた/外した場合の同期
-               const msg = payload.new;
-               const fid = msg.sender_id;
-               if (directChats.value[fid]) {
-                 const idx = directChats.value[fid].findIndex(m => m.id === msg.id);
-                 if (idx !== -1) {
-                   // Vueのリアクティブ検知を確実に発火させるため、クローンして配列自体を再代入
-                   directChats.value[fid][idx].reactions = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
-                   directChats.value[fid] = [...directChats.value[fid]];
-                 }
-               }
-            })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friend_messages', filter: `sender_id=eq.${user.id}` }, payload => {
-               // 自分がリアクションを付けた/外した場合の別端末同期
-               const msg = payload.new;
-               const fid = msg.receiver_id;
-               if (directChats.value[fid]) {
-                 const idx = directChats.value[fid].findIndex(m => m.id === msg.id);
-                 if (idx !== -1) {
-                   directChats.value[fid][idx].reactions = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
-                   directChats.value[fid] = [...directChats.value[fid]];
                  }
                }
             })
@@ -2938,35 +2860,6 @@
         
         const studyChatInput = ref('');
         let currentChatChannel = null;
-
-        const STAMPS = ['👍', '🎉', '🔥', '📖'];
-        const showReactionPopup = ref(null);
-
-        const toggleReaction = async (msg, emoji, dbTarget = false) => {
-          if (!msg.reactions) msg.reactions = {};
-          if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
-          
-          const { data: { user } } = await supa.auth.getUser();
-          const uid = user ? user.id : currentUser.value;
-          const idx = msg.reactions[emoji].indexOf(uid);
-          
-          const newReactions = JSON.parse(JSON.stringify(msg.reactions));
-          if (idx !== -1) {
-            newReactions[emoji].splice(idx, 1);
-            if (newReactions[emoji].length === 0) delete newReactions[emoji];
-          } else {
-            newReactions[emoji].push(uid);
-          }
-          
-          msg.reactions = newReactions;
-          showReactionPopup.value = null;
-
-          if (dbTarget !== true && msg.id && !msg.id.toString().startsWith('temp_')) {
-            const table = typeof dbTarget === 'string' ? dbTarget : 'messages';
-            const { error } = await supa.from(table).update({ reactions: newReactions }).eq('id', msg.id);
-            if (error) console.error(`Reaction update error in ${table}:`, error);
-          }
-        };
 
         const cleanupOldMessages = async (roomId) => {
           try {
@@ -3370,8 +3263,7 @@
                   id: msg.id,
                   sender: msg.sender_id === myId ? 'me' : 'friend',
                   text: msg.message,
-                  time: timeStr,
-                  reactions: {}
+                  time: timeStr
                 };
               });
             } else {
@@ -3434,8 +3326,7 @@
                   id: data.id,
                   sender: 'me',
                   text: data.message,
-                  time: timeStr,
-                  reactions: {}
+                  time: timeStr
                 });
                 chatCount.value++;
                 
@@ -3512,8 +3403,7 @@
           firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership,
           firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, filteredDummyFirms, joinFirm, createFirm, leaveFirm,
           friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest, rejectFriendRequest,
-          showBadgeModal, ALL_BADGES, equipBadge,
-          STAMPS, showReactionPopup, toggleReaction
+          showBadgeModal, ALL_BADGES, equipBadge
         };
       }
     });
