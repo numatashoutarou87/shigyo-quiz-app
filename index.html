@@ -3295,12 +3295,32 @@
             }
         };
 
-        const leaveFirm = () => {
+        const leaveFirm = async () => {
           if (confirm('本当にこのファームを脱退しますか？\n※これまでのファームチャット履歴は見られなくなります。')) {
-            isFarmMember.value = false;
-            firmJoinRoute.value = 'lobby';
-            firmChat.value = [];
-            alert('ファームを脱退しました。');
+            try {
+              // データベースから自分自身のレコードを完全に物理削除
+              const { error } = await supa
+                .from('farm_members')
+                .delete()
+                .eq('farm_id', myFarmId.value)
+                .eq('user_id', currentUser.value);
+                
+              if (error) {
+                console.error('脱退エラー:', error);
+                alert('脱退処理に失敗しました。');
+                return;
+              }
+              
+              isFarmMember.value = false;
+              firmJoinRoute.value = 'lobby';
+              firmChat.value = [];
+              myFarmId.value = '';
+              myFarmName.value = '';
+              alert('ファームを脱退しました。');
+            } catch (e) {
+              console.error(e);
+              alert('エラーが発生しました。');
+            }
           }
         };
 
@@ -3379,10 +3399,13 @@
         const joinFirm = async (f) => {
           if (!f || !f.id) return;
           try {
-            // データベースにメンバーとして登録
+            // 過去のデータが残っていても上書きできるようにupsertを使用
             const { error: memberError } = await supa
               .from('farm_members')
-              .insert([{ farm_id: f.id, user_id: currentUser.value, role: 'member' }]);
+              .upsert(
+                [{ farm_id: f.id, user_id: currentUser.value, role: 'member' }],
+                { onConflict: 'farm_id,user_id' }
+              );
 
             if (memberError) {
               console.error('ファーム加入エラー:', memberError);
