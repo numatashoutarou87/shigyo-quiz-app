@@ -2589,7 +2589,16 @@
           try {
             const { data, error } = await supa
               .from('friendships')
-              .select('*')
+              .select(`
+                id,
+                status,
+                sender:user_profiles!friendships_sender_id_fkey (
+                  id, user_name, level, active_badge, unlocked_badges, title
+                ),
+                receiver:user_profiles!friendships_receiver_id_fkey (
+                  id, user_name, level, active_badge, unlocked_badges, title
+                )
+              `)
               .eq('status', 'accepted')
               .or(`sender_id.eq.${myId},receiver_id.eq.${myId}`);
             
@@ -2599,27 +2608,29 @@
             }
             
             if (data && data.length > 0) {
-              // 自分がsenderならreceiverを、自分がreceiverならsenderを抽出
-              const opponentIds = data.map(f => f.sender_id === myId ? f.receiver_id : f.sender_id);
-              
-              const { data: profiles, error: pError } = await supa
-                .from('user_profiles')
-                .select('*')
-                .in('id', opponentIds);
+              friendsList.value = data.map(item => {
+                // Supabaseからの結合結果が配列になる場合を吸収
+                let s = item.sender;
+                let r = item.receiver;
+                if (Array.isArray(s)) s = s[0];
+                if (Array.isArray(r)) r = r[0];
+
+                // 自分ではない方のプロフィールを抽出
+                const friendProfile = (s && s.id === myId) ? r : s;
                 
-              if (!pError && profiles) {
-                friendsList.value = profiles.map(p => ({
-                  id: p.id,
-                  name: p.user_name || '不明なユーザー',
+                // フォールバック付きで描画用オブジェクトを生成
+                return {
+                  id: friendProfile?.id || 'unknown',
+                  name: friendProfile?.user_name || '不明なユーザー',
                   icon: '👤',
-                  level: p.level || 1,
-                  title: p.title || 'アソシエイト',
-                  unlocked_badges: p.unlocked_badges || []
-                }));
-                return;
-              }
+                  level: friendProfile?.level || 1,
+                  title: friendProfile?.title || 'アソシエイト',
+                  unlocked_badges: friendProfile?.unlocked_badges || []
+                };
+              });
+            } else {
+              friendsList.value = [];
             }
-            friendsList.value = [];
           } catch (e) {
             console.error('フレンド一覧例外:', e);
           }
