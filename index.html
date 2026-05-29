@@ -2783,8 +2783,12 @@
                const msg = payload.new;
                const fid = msg.sender_id;
                if (directChats.value[fid]) {
-                 const target = directChats.value[fid].find(m => m.id === msg.id);
-                 if (target) target.reactions = msg.reactions || {};
+                 const idx = directChats.value[fid].findIndex(m => m.id === msg.id);
+                 if (idx !== -1) {
+                   // Vueのリアクティブ検知を確実に発火させるため、クローンして配列自体を再代入
+                   directChats.value[fid][idx].reactions = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
+                   directChats.value[fid] = [...directChats.value[fid]];
+                 }
                }
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friend_messages', filter: `sender_id=eq.${user.id}` }, payload => {
@@ -2792,8 +2796,11 @@
                const msg = payload.new;
                const fid = msg.receiver_id;
                if (directChats.value[fid]) {
-                 const target = directChats.value[fid].find(m => m.id === msg.id);
-                 if (target) target.reactions = msg.reactions || {};
+                 const idx = directChats.value[fid].findIndex(m => m.id === msg.id);
+                 if (idx !== -1) {
+                   directChats.value[fid][idx].reactions = msg.reactions ? JSON.parse(JSON.stringify(msg.reactions)) : {};
+                   directChats.value[fid] = [...directChats.value[fid]];
+                 }
                }
             })
             .subscribe();
