@@ -366,6 +366,38 @@
   </style>
 </head>
 <body>
+  <div id="debug-error-box" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: #900; color: white; z-index: 9999999; padding: 20px; overflow: auto; font-family: monospace; text-align: left;">
+    <h2 style="color: yellow; margin-bottom: 10px;">デバッグ情報 (これを教えてください)</h2>
+    <pre id="debug-error-content" style="white-space: pre-wrap; word-break: break-all; font-size: 12px;"></pre>
+  </div>
+  <script>
+    (function(){
+      var oldWarn = console.warn;
+      var oldError = console.error;
+      var logToScreen = function(type, args) {
+        var box = document.getElementById('debug-error-box');
+        var content = document.getElementById('debug-error-content');
+        if(box && content) {
+          box.style.display = 'block';
+          var str = Array.from(args).map(function(a) { 
+            try { return typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a); }
+            catch(e) { return String(a); }
+          }).join(' ');
+          content.innerText += '[' + type + '] ' + str + '\n\n';
+        }
+      };
+      console.warn = function() { logToScreen('WARN', arguments); oldWarn.apply(console, arguments); };
+      console.error = function() { logToScreen('ERROR', arguments); oldError.apply(console, arguments); };
+      
+      window.addEventListener('error', function(e) {
+        logToScreen('UNCAUGHT', [e.message, e.filename + ':' + e.lineno, e.error ? e.error.stack : '']);
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        logToScreen('PROMISE', [e.reason]);
+      });
+    })();
+  </script>
+  
   <div id="app" class="app-container" v-cloak>
     
     <!-- LEVEL UP OVERLAY -->
