@@ -3067,50 +3067,48 @@
           try {
             console.log('--- loadFarmMembers 実行 ---');
             
-            // 1. まずファームメンバー一覧を取得 (JOINエラー回避のためシンプル取得)
-            const { data: membersData, error: membersError } = await supa
+            // 1. 現在のファームIDに所属するメンバーを単純取得
+            const { data: members, error: mError } = await supa
               .from('farm_members')
               .select('user_id, role')
               .eq('farm_id', myFarmId.value);
 
-            if (membersError) {
-              console.error('メンバー取得エラー:', membersError);
-              return;
-            }
-
-            if (!membersData || membersData.length === 0) {
+            if (mError || !members || members.length === 0) {
               firmMembers.value = [];
               return;
             }
 
-            // 2. メンバーのユーザーID配列を作成
-            const userIds = membersData.map(m => m.user_id);
+            // 2. 取得したuser_idの配列を作成
+            const userIds = members.map(m => m.user_id);
 
-            // 3. ユーザープロフィールを一括取得
-            const { data: profilesData, error: profilesError } = await supa
+            // 3. 結合を使わず、user_profilesからプロフィールをダイレクトに一括取得
+            const { data: profiles, error: pError } = await supa
               .from('user_profiles')
               .select('id, user_name, level, active_badge, intro')
               .in('id', userIds);
 
-            if (profilesError) {
-              console.error('プロフィール取得エラー:', profilesError);
+            if (pError || !profiles) {
+              console.error('プロフィールの読み込みエラー:', pError);
               return;
             }
 
-            // 4. データを手動結合して画面用配列を作成（自分自身も必ず含まれる）
-            firmMembers.value = membersData.map(m => {
-              const p = profilesData?.find(profile => profile.id === m.user_id) || {};
-              const lv = p.level || 1;
-              const titleIdx = Math.floor((lv - 1) / 5);
+            // 4. 画面への動的描画（Vueの配列に流し込むことでinnerHTMLと同様の描画を行います）
+            firmMembers.value = members.map(member => {
+              const prof = profiles.find(p => p.id === member.user_id);
+              const name = prof ? prof.user_name : "アソシエイト（同期中）";
+              const level = prof ? prof.level : 1;
+              const badge = (prof && prof.active_badge) ? prof.active_badge : "🔰";
+              
+              const titleIdx = Math.floor((level - 1) / 5);
               return {
-                id: m.user_id,
+                id: member.user_id,
                 farmId: myFarmId.value,
-                role: m.role,
-                name: p.user_name || '名称未設定',
-                level: lv,
+                role: member.role,
+                name: name,
+                level: level,
                 title: TITLES[Math.min(titleIdx, 19)] || '新人',
-                badge: p.active_badge || '🔰',
-                intro: p.intro || 'よろしくお願いします！'
+                badge: badge,
+                intro: (prof && prof.intro) ? prof.intro : 'よろしくお願いします！'
               };
             });
             console.log('結合完了後のメンバー配列:', firmMembers.value);
