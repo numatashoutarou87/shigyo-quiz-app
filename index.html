@@ -1026,7 +1026,7 @@
                 <div style="font-size:11px; color:#888; text-align:right; margin-bottom:5px;">本日の送信枠: {{ isPremium ? '無制限' : (10 - chatCount) + '/10' }}</div>
                 <div class="firm-chat-timeline" id="firmChatArea" style="flex:1;">
                   <div class="firm-msg" v-for="(m, i) in firmChat" :key="i" :class="{'my-msg': m.isMe || m.sender.includes('あなた') || m.sender.includes(displayName), 'system-msg': m.sender === 'システム'}">
-                    <div class="firm-msg-sender" v-if="m.sender !== 'システム'">{{ m.sender }}</div>
+                    <div class="firm-msg-sender" v-if="m.sender !== 'システム'" @click="openMemberProfileFromChat(m.userId)" style="cursor: pointer; font-weight: bold; text-decoration: underline;">{{ m.sender }}</div>
                     <div class="firm-msg-text">{{ m.text }}</div>
                   </div>
                 </div>
@@ -3193,6 +3193,39 @@
           showMemberProfileModal.value = true;
         };
 
+        const openMemberProfileFromChat = async (userId) => {
+          if (!userId) return;
+          try {
+            // まず現在取得済みのfirmMembersから探す（高速）
+            let member = firmMembers.value.find(m => m.id === userId);
+            
+            // 見つからなければDBから最新のプロフィールを取得
+            if (!member) {
+              const { data, error } = await supa.from('user_profiles').select('*').eq('id', userId).single();
+              if (data) {
+                const lv = data.level || 1;
+                const titleIdx = Math.floor((lv - 1) / 5);
+                member = {
+                  id: data.id,
+                  farmId: myFarmId.value, // キック処理判定用
+                  role: 'unknown',
+                  name: data.user_name || '名称未設定',
+                  level: lv,
+                  title: TITLES[Math.min(titleIdx, 19)] || '新人',
+                  badge: data.active_badge || '🔰',
+                  intro: data.intro || 'よろしくお願いします！'
+                };
+              }
+            }
+            
+            if (member) {
+              openMemberProfile(member);
+            }
+          } catch(e) {
+            console.error('プロフィール取得エラー:', e);
+          }
+        };
+
         const isAlreadyFriend = (id) => {
           return friendsList.value.some(f => f.id === id);
         };
@@ -3233,6 +3266,7 @@
             const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             firmChat.value.push({ 
               id: tempId,
+              userId: currentUser.value, // プロフィール表示用
               isMe: true, 
               sender: `[${activeBadgeDisplay.value}] ${displayName.value}`, 
               text: content,
@@ -3648,6 +3682,7 @@
               const timeStr = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
               return { 
                 id: msg.id,
+                userId: msg.user_id, // プロフィール表示用
                 isMe: msg.user_id === currentUser.value,
                 sender: `[${msg.avatar_badge}] ${msg.user_name}`,
                 text: msg.content,
@@ -3689,7 +3724,7 @@
           examCountdownString, isExamLive, startMockExam,
           examQueue, examCurrentIndex, examCurrentQuestion, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
-          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership, openFarmMembers,
+          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership, openFarmMembers,
           firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm, myFarmName, debugDeleteAllFarms,
           friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge
