@@ -863,7 +863,6 @@
                     </div>
                     <div style="display:flex; gap: 5px;">
                       <button @click="acceptFriendRequest(req.id)" style="padding: 6px 12px; font-size: 12px; width: auto; min-width: 60px; background: var(--accent-gold); color: #fff; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap;">承認</button>
-                      <button @click="rejectFriendRequest(req.id)" style="padding: 6px 12px; font-size: 12px; width: auto; min-width: 60px; background: #666; color: #fff; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap;">拒否</button>
                     </div>
                   </div>
                 </div>
@@ -2766,34 +2765,6 @@
           }
         };
 
-        const rejectFriendRequest = async (requestId) => {
-          const targetReq = pendingRequests.value.find(r => r.id === requestId);
-          const targetUserId = targetReq ? targetReq.sender_id : null;
-
-          pendingRequests.value = pendingRequests.value.filter(r => r.id !== requestId);
-
-          if (targetUserId) {
-            requestedFriends.value = requestedFriends.value.filter(id => id !== targetUserId);
-          }
-
-          try {
-            const { error } = await supa
-              .from('friendships')
-              .delete()
-              .eq('id', requestId);
-              
-            if (error) {
-              console.error('拒否エラー:', error.message);
-              alert('データベース上の申請レコード削除に失敗しました。');
-              await loadPendingRequests();
-            } else {
-              await loadPendingRequests();
-              await loadFriendsList();
-            }
-          } catch (e) {
-            console.error('拒否時の予期せぬ例外:', e);
-          }
-        };
 
         const cancelFriendRequest = async (receiverId) => {
           const { data: { user } } = await supa.auth.getUser();
@@ -3431,7 +3402,7 @@
 
           firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership,
           firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, filteredDummyFirms, joinFirm, createFirm, leaveFirm,
-          friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest, rejectFriendRequest,
+          friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge
         };
       }
