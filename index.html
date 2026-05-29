@@ -1688,7 +1688,7 @@
           }
         };
 
-        const saveUserProfile = async () => {
+        const saveUserProfile = async (showDebugAlert = false) => {
           if (!currentUser.value) return;
           try {
             const profile = {
@@ -1701,9 +1701,20 @@
               active_badge: activeBadge.value,
               completed_blocks: Object.keys(masteredBlocks.value)
             };
-            await supa.from('user_profiles').upsert([profile]);
+            const { data, error } = await supa.from('user_profiles').upsert([profile]);
+            
+            if (showDebugAlert) {
+              if (error) {
+                alert(`【プロフ作成エラー】原因: ${error.message}\n詳細: ${error.details || JSON.stringify(error)}`);
+              } else {
+                alert(`【プロフ作成成功】データベースに正常に登録されました！`);
+              }
+            } else if (error) {
+              console.error('Profile upsert error:', error);
+            }
           } catch (e) {
             console.error('Profile save error:', e);
+            if (showDebugAlert) alert(`【プロフ保存例外エラー】\n${e.message}`);
           }
         };
 
@@ -1914,7 +1925,7 @@
           loadGlobalData();
           await syncUserProfile(currentUser.value);
           // 新規ユーザー対策：ログイン直後にプロフィールを強制upsertして検索可能にする
-          saveUserProfile();
+          saveUserProfile(true);
           
           activeMode.value = null;
           authScreen.value = 'app';
@@ -1965,7 +1976,7 @@
           loadGlobalData();
           await syncUserProfile(currentUser.value);
           // 新規ユーザー対策：登録直後にプロフィールを強制upsertして検索可能にする
-          saveUserProfile();
+          saveUserProfile(true);
           
           activeMode.value = null;
           authScreen.value = 'app';
