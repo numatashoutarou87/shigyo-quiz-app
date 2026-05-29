@@ -1316,6 +1316,7 @@
             saveUserProfile(true);
             await loadPendingRequests();
             await loadFriendsList();
+            setupRealtimeFriendships();
             authScreen.value = 'app';
           }
         });
@@ -1970,6 +1971,7 @@
           saveUserProfile(true);
           await loadPendingRequests();
           await loadFriendsList();
+          setupRealtimeFriendships();
           
           activeMode.value = null;
           authScreen.value = 'app';
@@ -2023,6 +2025,7 @@
           saveUserProfile(true);
           await loadPendingRequests();
           await loadFriendsList();
+          setupRealtimeFriendships();
           
           activeMode.value = null;
           authScreen.value = 'app';
@@ -2661,6 +2664,32 @@
           }
         };
 
+        let friendReqSub = null;
+        const setupRealtimeFriendships = async () => {
+          const { data: { user } } = await supa.auth.getUser();
+          if (!user) return;
+          
+          if (friendReqSub) {
+            supa.removeChannel(friendReqSub);
+          }
+          
+          friendReqSub = supa
+            .channel('friendships_channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${user.id}` }, payload => {
+              loadPendingRequests();
+              loadFriendsList();
+              
+              if (payload.eventType === 'INSERT' && payload.new.status === 'pending') {
+                const msg = document.createElement('div');
+                msg.innerText = 'ピコン！新しいフレンド申請が届きました！';
+                msg.style = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:var(--accent-gold); color:var(--primary-navy); padding:10px 20px; border-radius:20px; z-index:9999; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);';
+                document.body.appendChild(msg);
+                setTimeout(() => msg.remove(), 4000);
+              }
+            })
+            .subscribe();
+        };
+
         const acceptFriendRequest = async (requestId) => {
           try {
             const { error } = await supa
@@ -3217,6 +3246,9 @@
         ]);
 
         watch([activeTab, firmRoute], () => {
+          if (activeTab.value === 'friend') {
+            loadPendingRequests();
+          }
           if (activeTab.value === 'firm' && isFarmMember.value && firmRoute.value === 'chat') {
             firmChat.value = [];
             subscribeToRoom('farm_room_' + myFarmId.value, firmChat, (msg) => {
