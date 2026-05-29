@@ -2648,12 +2648,29 @@
           }
         };
 
+        const syncRequestedFriends = async () => {
+          const { data: { user } } = await supa.auth.getUser();
+          if (!user) return;
+          const { data: rels } = await supa
+            .from('friendships')
+            .select('*')
+            .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+          if (rels) {
+            requestedFriends.value = rels.map(r => r.sender_id === user.id ? r.receiver_id : r.sender_id);
+          } else {
+            requestedFriends.value = [];
+          }
+        };
+
         let friendReqSub = null;
         let chatSub = null;
         const setupRealtimeFriendships = async () => {
           const { data: { user } } = await supa.auth.getUser();
           if (!user) return;
           
+          // 初回起動時にも申請状態を完全に同期する
+          syncRequestedFriends();
+
           if (friendReqSub) supa.removeChannel(friendReqSub);
           if (chatSub) supa.removeChannel(chatSub);
           
@@ -2662,6 +2679,7 @@
             .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${user.id}` }, payload => {
               loadPendingRequests();
               loadFriendsList();
+              syncRequestedFriends();
               
               if (payload.eventType === 'INSERT' && payload.new.status === 'pending') {
                 const msg = document.createElement('div');
@@ -2672,9 +2690,10 @@
               }
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: `sender_id=eq.${user.id}` }, payload => {
-              // 自分が送った申請が承認された時などにもリストを更新
+              // 自分が送った申請が承認・拒否された時などにもUIを完全同期
               loadPendingRequests();
               loadFriendsList();
+              syncRequestedFriends();
             })
             .subscribe();
 
