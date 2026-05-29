@@ -977,13 +977,13 @@
                   <div class="msg-reactions" v-if="m.reactions" :style="m.sender === 'me' ? 'justify-content: flex-end;' : ''">
                     <span v-for="(users, emoji) in m.reactions" :key="emoji" 
                           class="reaction-badge" :class="{'my-reaction': users.includes(currentUser)}"
-                          @click="toggleReaction(m, emoji, true)">
+                          @click="toggleReaction(m, emoji, 'friend_messages')">
                       {{ emoji }} {{ users.length }}
                     </span>
-                    <button class="reaction-add-btn" @click.stop="showReactionPopup = 'local_' + i">
+                    <button class="reaction-add-btn" @click.stop="showReactionPopup = m.id">
                       ＋
-                      <div class="reaction-popover" v-if="showReactionPopup === 'local_' + i" :style="m.sender === 'me' ? 'right: 0; left: auto;' : 'left: 0; right: auto;'">
-                        <span v-for="st in STAMPS" :key="st" @click.stop="toggleReaction(m, st, true)">{{ st }}</span>
+                      <div class="reaction-popover" v-if="showReactionPopup === m.id" :style="m.sender === 'me' ? 'right: 0; left: auto;' : 'left: 0; right: auto;'">
+                        <span v-for="st in STAMPS" :key="st" @click.stop="toggleReaction(m, st, 'friend_messages')">{{ st }}</span>
                       </div>
                     </button>
                   </div>
@@ -2778,6 +2778,24 @@
                  }
                }
             })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friend_messages', filter: `receiver_id=eq.${user.id}` }, payload => {
+               // 相手がリアクションを付けた/外した場合の同期
+               const msg = payload.new;
+               const fid = msg.sender_id;
+               if (directChats.value[fid]) {
+                 const target = directChats.value[fid].find(m => m.id === msg.id);
+                 if (target) target.reactions = msg.reactions || {};
+               }
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friend_messages', filter: `sender_id=eq.${user.id}` }, payload => {
+               // 自分がリアクションを付けた/外した場合の別端末同期
+               const msg = payload.new;
+               const fid = msg.receiver_id;
+               if (directChats.value[fid]) {
+                 const target = directChats.value[fid].find(m => m.id === msg.id);
+                 if (target) target.reactions = msg.reactions || {};
+               }
+            })
             .subscribe();
         };
 
@@ -2917,11 +2935,12 @@
         const STAMPS = ['👍', '🎉', '🔥', '📖'];
         const showReactionPopup = ref(null);
 
-        const toggleReaction = async (msg, emoji, isLocal = false) => {
+        const toggleReaction = async (msg, emoji, dbTarget = false) => {
           if (!msg.reactions) msg.reactions = {};
           if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
           
-          const uid = currentUser.value;
+          const { data: { user } } = await supa.auth.getUser();
+          const uid = user ? user.id : currentUser.value;
           const idx = msg.reactions[emoji].indexOf(uid);
           
           const newReactions = JSON.parse(JSON.stringify(msg.reactions));
@@ -2935,9 +2954,10 @@
           msg.reactions = newReactions;
           showReactionPopup.value = null;
 
-          if (!isLocal && msg.id && !msg.id.toString().startsWith('temp_')) {
-            const { error } = await supa.from('messages').update({ reactions: newReactions }).eq('id', msg.id);
-            if (error) console.error('Reaction update error:', error);
+          if (dbTarget !== true && msg.id && !msg.id.toString().startsWith('temp_')) {
+            const table = typeof dbTarget === 'string' ? dbTarget : 'messages';
+            const { error } = await supa.from(table).update({ reactions: newReactions }).eq('id', msg.id);
+            if (error) console.error(`Reaction update error in ${table}:`, error);
           }
         };
 
