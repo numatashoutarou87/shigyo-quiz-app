@@ -3325,24 +3325,63 @@
         };
 
         const dissolveFarm = async () => {
-          if (confirm('【警告】本当にファームを解散しますか？\n全てのチャット履歴とメンバー情報が完全に消去され、元に戻せません。')) {
-            try {
-              const targetFarmId = myFarmId.value;
-              const { error } = await supa.from('farms').delete().eq('id', targetFarmId);
+          if (!myFarmId.value) return;
+
+          const confirmFirst = confirm('【警告】本当にファームを解散しますか？\n全てのチャット履歴とメンバー情報が完全に消去され、元に戻せません。');
+          if (!confirmFirst) return;
+
+          console.log("解散処理を開始します。対象ファームID:", myFarmId.value);
+          const targetFarmId = myFarmId.value;
+
+          try {
+            // 【ステップ1】このファームの全チャットメッセージを先に完全削除
+            // ※既存の仕様に合わせてテーブル名 'messages', カラム名 'room_id' で削除します
+            const { error: msgError } = await supa
+              .from('messages')
+              .delete()
+              .eq('room_id', 'farm_room_' + targetFarmId);
               
-              if (error) throw error;
-              
-              alert('ファームを解散しました。');
-              isFarmMember.value = false;
-              isFirmOwner.value = false;
-              firmJoinRoute.value = 'lobby';
-              firmChat.value = [];
-              myFarmId.value = '';
-              myFarmName.value = '';
-            } catch (e) {
-              console.error('ファーム解散エラー:', e);
-              alert('解散処理に失敗しました: ' + e.message);
+            if (msgError) console.error("メッセージ削除中にエラー（無視して続行します）:", msgError);
+
+            // 【ステップ2】このファームの全メンバー行（自分も含む全員）を完全削除
+            // これにより、メンバー全員の所属データが消え、自動的に全員が「ファーム未所属状態」になります！
+            const { error: memError } = await supa
+              .from('farm_members')
+              .delete()
+              .eq('farm_id', targetFarmId);
+
+            if (memError) {
+              console.error("メンバー行の削除に失敗しました:", memError);
+              alert("解散処理（メンバー削除）に失敗しました: " + memError.message);
+              return;
             }
+
+            // 【ステップ3】外堀が埋まったので、最後にファーム本体を完全に削除！
+            const { error: farmError } = await supa
+              .from('farms')
+              .delete()
+              .eq('id', targetFarmId);
+
+            if (farmError) {
+              console.error("ファーム本体の削除に失敗しました:", farmError);
+              alert("ファーム本体の削除に失敗しました: " + farmError.message);
+              return;
+            }
+
+            // 【ステップ4】ノーリロードで画面の状態（所属フラグなど）をクリアし、ホーム（ロビー）へ遷移
+            alert("ファームを解散しました。");
+            
+            // JavaScript側の所属状態変数を初期化
+            isFarmMember.value = false;
+            isFirmOwner.value = false;
+            firmJoinRoute.value = 'lobby';
+            firmChat.value = [];
+            myFarmId.value = '';
+            myFarmName.value = '';
+            
+          } catch (e) {
+            console.error('予期せぬファーム解散エラー:', e);
+            alert('解散処理中に予期せぬエラーが発生しました: ' + e.message);
           }
         };
 
