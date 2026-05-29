@@ -28,7 +28,7 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', 'Noto Sans JP', sans-serif; background-color: #E9ECEF; color: var(--text-main); line-height: 1.6; height: 100vh; display: flex; justify-content: center; align-items: center; }
-    [v-cloak] { display: none; }
+    [v-cloak] { display: none !important; }
 
     .app-container { width: 100%; max-width: 414px; height: 100vh; max-height: 896px; background-color: var(--bg-light); display: flex; flex-direction: column; position: relative; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
     
@@ -445,7 +445,7 @@
     </div>
 
     <!-- GOOGLE PLAY MODAL -->
-    <div v-if="showGPlayModal" class="gplay-overlay">
+    <div v-show="showGPlayModal" class="gplay-overlay" style="display: none;">
       <div class="gplay-modal">
         <div class="gplay-header">
           <div class="gplay-logo">▶</div>
@@ -1180,7 +1180,7 @@
         </nav>
         
         <!-- Paywall -->
-        <div class="paywall-overlay" v-if="paywallConfig.show">
+        <div class="paywall-overlay" v-show="paywallConfig.show" style="display: none;">
           <div class="paywall-box">
             <div class="paywall-icon">🔒</div>
             <h2>{{ paywallConfig.title }}</h2>
@@ -1218,22 +1218,24 @@
       </transition>
 
       <!-- Vueのtransitionによるフリーズバグを回避し、確実な非表示ロジックを備えたプライバシーポリシーモーダル -->
-      <div id="privacy-policy-modal" class="terms-modal-overlay" v-if="showPrivacyModal" @click.self="showPrivacyModal = false">
-        <div class="terms-modal-content">
-          <div class="terms-modal-header">プライバシーポリシー</div>
-          <div class="terms-modal-body">
-            <h3>1. 個人情報の収集と利用</h3>
-            <p>本アプリは、アカウント作成および本人確認のためにメールアドレスを取得します。取得した情報はアプリの提供（ログイン管理、学習データの保存、ランキング表示等）のみに利用し、法令に基づく場合を除き、第三者への提供は一切行いません。</p>
-            <h3>2. データの保護とセキュリティ</h3>
-            <p>通信は全て暗号化され、ユーザーデータはセキュアなデータベース（Supabase）にて厳重に管理されます。パスワードは復元不可能な形式でハッシュ化して保存されます。</p>
-            <h3>3. クッキー等の利用</h3>
-            <p>本サービスでは、ログイン状態の維持等のためにローカルストレージおよびセッション機能を使用しています。</p>
-          </div>
-          <div class="terms-modal-footer">
-            <button class="primary-btn" style="width:100px; margin:0 auto; position: relative; z-index: 9999;" @click="showPrivacyModal = false" onclick="closePrivacyPolicy()">閉じる</button>
+      <transition name="fade">
+        <div id="privacy-policy-modal" class="terms-modal-overlay" v-show="showPrivacyModal" style="display: none;" @click.self="showPrivacyModal = false">
+          <div class="terms-modal-content">
+            <div class="terms-modal-header">プライバシーポリシー</div>
+            <div class="terms-modal-body">
+              <h3>1. 個人情報の収集と利用</h3>
+              <p>本アプリは、アカウント作成および本人確認のためにメールアドレスを取得します。取得した情報はアプリの提供（ログイン管理、学習データの保存、ランキング表示等）のみに利用し、法令に基づく場合を除き、第三者への提供は一切行いません。</p>
+              <h3>2. データの保護とセキュリティ</h3>
+              <p>通信は全て暗号化され、ユーザーデータはセキュアなデータベース（Supabase）にて厳重に管理されます。パスワードは復元不可能な形式でハッシュ化して保存されます。</p>
+              <h3>3. クッキー等の利用</h3>
+              <p>本サービスでは、ログイン状態の維持等のためにローカルストレージおよびセッション機能を使用しています。</p>
+            </div>
+            <div class="terms-modal-footer">
+              <button class="primary-btn" style="width:100px; margin:0 auto;" @click="showPrivacyModal = false">閉じる</button>
+            </div>
           </div>
         </div>
-      </div>
+      </transition>
       <!-- Vue管理から外し、ネイティブJSで確実に制御する祝いモーダル -->
       <div id="celebration-modal" class="terms-modal-overlay" style="display: none; z-index: 99999; flex-direction: column;">
         <div style="font-size: 80px; animation: bounce 1s infinite;">🎊</div>
@@ -1281,7 +1283,13 @@
         // --- Multi-User Auth & State Management ---
         const authScreen = ref('login');
         const currentUser = ref(null);
-        let app_users = JSON.parse(localStorage.getItem('app_users')) || {};
+        let app_users = {};
+        try {
+          app_users = JSON.parse(localStorage.getItem('app_users')) || {};
+        } catch (e) {
+          app_users = {};
+          localStorage.removeItem('app_users');
+        }
 
         onMounted(async () => {
           const { data: { session } } = await supa.auth.getSession();
@@ -2375,15 +2383,6 @@
         window.closeCelebration = () => {
           const modal = document.getElementById('celebration-modal');
           if (modal) modal.style.display = 'none';
-        };
-
-        window.closePrivacyPolicy = () => {
-          const modal = document.getElementById('privacy-policy-modal');
-          if (modal) {
-            modal.style.display = 'none';
-            // 確実なクリック透過による背面フリーズの強制解除
-            modal.style.pointerEvents = 'none';
-          }
         };
 
         const triggerCelebration = (msg, isLegend = false) => {
