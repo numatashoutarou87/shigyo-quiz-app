@@ -937,7 +937,13 @@
                     </div>
                     <div class="friend-level">Lv.{{ user.level }} ・ {{ user.title || 'アソシエイト' }}</div>
                   </div>
-                  <button class="primary-btn" @click="sendFriendRequestAPI(user)" style="padding: 6px 12px; font-size: 11px; width: auto;">申請</button>
+                  <button class="primary-btn" 
+                    @click="sendFriendRequestAPI(user)" 
+                    :disabled="isAlreadyFriend(user.id) || requestedFriends.includes(user.id)" 
+                    :style="(isAlreadyFriend(user.id) || requestedFriends.includes(user.id)) ? 'background:#ccc; color:#fff; cursor:not-allowed; padding: 6px 12px; font-size: 11px; width: auto;' : 'padding: 6px 12px; font-size: 11px; width: auto; background: var(--accent-gold); color: #fff; border: none;'"
+                  >
+                    {{ isAlreadyFriend(user.id) ? 'フレンド済' : (requestedFriends.includes(user.id) ? '申請中' : '申請') }}
+                  </button>
                 </div>
               </div>
             </div>
@@ -2535,6 +2541,22 @@
             if (error) {
               console.error("ユーザー検索エラー詳細:", error);
             } else if (data) {
+              const userIds = data.map(u => u.id);
+              if (userIds.length > 0 && currentUser.value) {
+                const { data: rels } = await supa
+                  .from('friendships')
+                  .select('receiver_id, sender_id, status')
+                  .or(`sender_id.eq.${currentUser.value},receiver_id.eq.${currentUser.value}`);
+                
+                if (rels && rels.length > 0) {
+                  rels.forEach(r => {
+                    const otherId = r.sender_id === currentUser.value ? r.receiver_id : r.sender_id;
+                    if (!requestedFriends.value.includes(otherId)) {
+                      requestedFriends.value.push(otherId);
+                    }
+                  });
+                }
+              }
               searchedUsers.value = data;
             }
           } catch (e) {
@@ -2677,10 +2699,22 @@
               }]);
               
             if (error) {
-              alert('申請エラー: ' + error.message);
+              if (error.code === '23505') {
+                requestedFriends.value.push(user.id);
+                // トースト等で優しく通知
+                const msg = document.createElement('div');
+                msg.innerText = 'すでに申請済みです';
+                msg.style = 'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:10px 20px; border-radius:20px; z-index:9999; font-size:14px;';
+                document.body.appendChild(msg);
+                setTimeout(() => msg.remove(), 3000);
+              } else {
+                alert('申請エラー: ' + error.message);
+              }
             } else {
               alert(`${user.user_name} にフレンド申請を送りました！`);
-              requestedFriends.value.push(user.id);
+              if (!requestedFriends.value.includes(user.id)) {
+                requestedFriends.value.push(user.id);
+              }
             }
           } catch (e) {
             console.error('申請送信例外:', e);
