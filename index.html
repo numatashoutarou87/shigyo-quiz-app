@@ -2669,6 +2669,7 @@
         const hasSearched = ref(false);
 
         const searchUsers = async () => {
+          // 1. 入力文字のクリーンアップ（不要な空白の自動除去）
           const keyword = userSearchQuery.value.trim();
           if (!keyword) return;
 
@@ -2681,7 +2682,9 @@
             const { data, error } = await supa
               .from('user_profiles')
               .select('id, user_name, level, title, unlocked_badges')
+              // 2. 大文字・小文字を区別しない「あいまい検索（ilike）」
               .ilike('user_name', `%${keyword}%`)
+              // 3. 自分自身を検索結果から除外する安全ロジック
               .neq('id', myId)
               .limit(30);
 
