@@ -3066,63 +3066,73 @@
           if (!myFarmId.value) return;
           try {
             console.log('--- loadFarmMembers 実行 ---');
-            console.log('対象ファームID:', myFarmId.value);
             
-            const { data, error } = await supa
+            // 1. まずファームメンバー一覧を取得 (JOINエラー回避のためシンプル取得)
+            const { data: membersData, error: membersError } = await supa
               .from('farm_members')
-              .select(`
-                user_id,
-                role,
-                user_profiles (
-                  user_name,
-                  level,
-                  active_badge,
-                  intro
-                )
-              `)
+              .select('user_id, role')
               .eq('farm_id', myFarmId.value);
 
-            if (error) {
-              console.error('メンバー取得エラー詳細:', error);
+            if (membersError) {
+              console.error('メンバー取得エラー:', membersError);
               return;
             }
 
-            console.log('取得データ(Raw):', data);
-
-            if (data) {
-              firmMembers.value = data.map(m => {
-                // 配列で返ってくる場合とオブジェクトで返ってくる場合を両方カバー
-                let p = null;
-                if (Array.isArray(m.user_profiles) && m.user_profiles.length > 0) {
-                  p = m.user_profiles[0];
-                } else if (m.user_profiles && !Array.isArray(m.user_profiles)) {
-                  p = m.user_profiles;
-                }
-                
-                if (!p) {
-                  console.warn('ユーザープロフィールが存在しません:', m);
-                  p = {}; // クラッシュ防止のフォールバック
-                }
-
-                const lv = p.level || 1;
-                const titleIdx = Math.floor((lv - 1) / 5);
-                return {
-                  id: m.user_id,
-                  farmId: myFarmId.value,
-                  role: m.role,
-                  name: p.user_name || '名称未設定',
-                  level: lv,
-                  title: TITLES[Math.min(titleIdx, 19)] || '新人',
-                  badge: p.active_badge || '🔰',
-                  intro: p.intro || 'よろしくお願いします！'
-                };
-              });
-              console.log('マッピング完了後のメンバー配列:', firmMembers.value);
+            if (!membersData || membersData.length === 0) {
+              firmMembers.value = [];
+              return;
             }
+
+            // 2. メンバーのユーザーID配列を作成
+            const userIds = membersData.map(m => m.user_id);
+
+            // 3. ユーザープロフィールを一括取得
+            const { data: profilesData, error: profilesError } = await supa
+              .from('user_profiles')
+              .select('id, user_name, level, active_badge, intro')
+              .in('id', userIds);
+
+            if (profilesError) {
+              console.error('プロフィール取得エラー:', profilesError);
+              return;
+            }
+
+            // 4. データを手動結合して画面用配列を作成（自分自身も必ず含まれる）
+            firmMembers.value = membersData.map(m => {
+              const p = profilesData?.find(profile => profile.id === m.user_id) || {};
+              const lv = p.level || 1;
+              const titleIdx = Math.floor((lv - 1) / 5);
+              return {
+                id: m.user_id,
+                farmId: myFarmId.value,
+                role: m.role,
+                name: p.user_name || '名称未設定',
+                level: lv,
+                title: TITLES[Math.min(titleIdx, 19)] || '新人',
+                badge: p.active_badge || '🔰',
+                intro: p.intro || 'よろしくお願いします！'
+              };
+            });
+            console.log('結合完了後のメンバー配列:', firmMembers.value);
+            
           } catch (e) {
-            console.error('ファームメンバー取得例外エラー:', e);
+            console.error('例外エラー:', e);
           }
         };
+
+        // メンバー一覧のリアルタイム自動更新を仕掛ける
+        const initFarmMembersSubscription = () => {
+          supa.channel('public:farm_members')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_members' }, payload => {
+              const affectedFarm = payload.new?.farm_id || payload.old?.farm_id;
+              if (affectedFarm === myFarmId.value) {
+                console.log('ファームメンバーの増減を検知しました。自動更新します。');
+                loadFarmMembers();
+              }
+            })
+            .subscribe();
+        };
+        initFarmMembersSubscription();
 
         // ファームIDが変わった時や初回にロード
         watch(myFarmId, () => {
