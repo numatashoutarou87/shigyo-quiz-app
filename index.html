@@ -178,8 +178,8 @@
     /* STUDY TIMELINE (Inside Quiz Screen) */
     .study-timeline-area { flex: 4; display: flex; flex-direction: column; background: var(--bg-white); border-top: 2px solid var(--border-color); overflow: hidden; }
     .timeline-header { padding: 8px 16px; background: #e9ecef; font-size: 12px; font-weight: bold; color: var(--primary-navy); display: flex; justify-content: space-between; }
-    .timeline-logs { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-    .log-item { font-size: 12px; padding: 6px 10px; background: var(--bg-light); border-radius: 8px; border-left: 3px solid var(--accent-gold); animation: fade-in 0.3s; }
+    .timeline-logs { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .log-item { font-size: 12px; padding: 6px 10px; background: var(--bg-light); border-radius: 8px; border-left: 3px solid var(--accent-gold); animation: fade-in 0.3s; word-break: break-all; overflow-wrap: break-word; }
     .log-time { color: #888; font-size: 10px; margin-right: 6px; }
 
     /* CHAT INPUT */
@@ -3002,41 +3002,57 @@
           }
         };
 
-        const generateFirmMembers = () => {
-          const badges = ['🔰 新人', '🔥 熱血', '📚 勉強鬼', '🏆 ランカー'];
-          const intros = ['絶対合格！', '毎日コツコツ頑張ります', '模試で負けません', 'よろしくお願いします！', '過去問中心に勉強中です。', '今年こそは！'];
-          return Array.from({length: 9}, (_, i) => {
-            const lv = Math.floor(Math.random() * 30) + 1;
-            const titleIdx = Math.floor((lv - 1) / 5);
-            return {
-              id: 'firm_u' + i,
-              farmId: myFarmId.value,
-              name: `アソシエイト ${i+1}号`,
-              level: lv,
-              title: TITLES[Math.min(titleIdx, 19)],
-              badge: badges[Math.floor(Math.random() * badges.length)],
-              intro: intros[Math.floor(Math.random() * intros.length)]
-            };
-          });
-        };
-        const firmMembers = ref(generateFirmMembers());
-        const addDummyFirmMembers = (count) => {
-          const badges = ['🔰 新人', '🔥 熱血', '📚 勉強鬼', '🏆 ランカー', '✨ 期待の新星'];
-          const intros = ['絶対合格！', 'よろしくお願いします！', '過去問復習中。', '今日も徹夜です'];
-          for(let i=0; i<count; i++) {
-            const lv = Math.floor(Math.random() * 30) + 1;
-            const titleIdx = Math.floor((lv - 1) / 5);
-            firmMembers.value.push({
-              id: 'firm_u_new_' + Math.random().toString(36).substr(2, 5),
-              farmId: myFarmId.value,
-              name: `アソシエイト ${firmMembers.value.length + 1}号`,
-              level: lv,
-              title: TITLES[Math.min(titleIdx, 19)],
-              badge: badges[Math.floor(Math.random() * badges.length)],
-              intro: intros[Math.floor(Math.random() * intros.length)]
-            });
+        const firmMembers = ref([]);
+
+        const loadFarmMembers = async () => {
+          if (!myFarmId.value) return;
+          try {
+            const { data, error } = await supa
+              .from('farm_members')
+              .select(`
+                user_id,
+                role,
+                user_profiles:user_id (
+                  user_name,
+                  level,
+                  active_badge,
+                  intro
+                )
+              `)
+              .eq('farm_id', myFarmId.value);
+
+            if (data && !error) {
+              firmMembers.value = data.map(m => {
+                const p = m.user_profiles || {};
+                const lv = p.level || 1;
+                const titleIdx = Math.floor((lv - 1) / 5);
+                return {
+                  id: m.user_id, // キック処理等で使う一意識別子
+                  farmId: myFarmId.value,
+                  role: m.role,
+                  name: p.user_name || '名称未設定',
+                  level: lv,
+                  title: TITLES[Math.min(titleIdx, 19)] || '新人',
+                  badge: p.active_badge || '🔰',
+                  intro: p.intro || 'よろしくお願いします！'
+                };
+              });
+            }
+          } catch (e) {
+            console.error('ファームメンバー取得エラー:', e);
           }
-          alert(`ファームにダミーメンバーを${count}人追加しました。`);
+        };
+
+        // ファームIDが変わった時や初回にロード
+        watch(myFarmId, () => {
+          if (myFarmId.value) loadFarmMembers();
+        });
+        if (myFarmId.value) {
+          loadFarmMembers();
+        }
+
+        const addDummyFirmMembers = (count) => {
+          alert('本物データ連動版になったため、ダミー追加機能は無効化されました。');
         };
         const firmRoute = ref('chat');
         const showMemberProfileModal = ref(false);
@@ -3202,10 +3218,23 @@
           newFirmIntro.value = '';
         };
         
-        const kickFirmMember = (m) => {
+        const kickFirmMember = async (m) => {
           if (confirm(`本当に ${m.name} さんをファームから強制脱退させますか？`)) {
-            firmMembers.value = firmMembers.value.filter(member => member.id !== m.id);
-            alert(`${m.name} さんをキックしました。`);
+            try {
+              const { error } = await supa
+                .from('farm_members')
+                .delete()
+                .eq('user_id', m.id)
+                .eq('farm_id', myFarmId.value);
+              if (!error) {
+                firmMembers.value = firmMembers.value.filter(member => member.id !== m.id);
+                alert(`${m.name} さんをキックしました。`);
+              } else {
+                alert('キック処理に失敗しました。');
+              }
+            } catch (e) {
+              console.error('キックエラー:', e);
+            }
           }
         };
 
