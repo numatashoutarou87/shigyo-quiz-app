@@ -2869,18 +2869,24 @@
             // 1. ファームをデータベースに登録
             const { data: newFarm, error: farmError } = await supa
               .from('farms')
-              .insert([{ name: fn, description: fi, members: 1 }])
+              .insert([{ name: fn, description: fi, current_members: 1 }])
               .select()
               .single();
 
-            if (farmError) throw farmError;
+            if (farmError) {
+              console.error('ファーム登録エラー:', farmError);
+              throw farmError;
+            }
 
             // 2. 自分を設立者(leader)として登録
             const { error: memberError } = await supa
               .from('farm_members')
               .insert([{ farm_id: newFarm.id, user_id: currentUser.value, role: 'leader' }]);
 
-            if (memberError) throw memberError;
+            if (memberError) {
+              console.error('ファームメンバー登録エラー:', memberError);
+              throw memberError;
+            }
 
             // ローカルステートの更新
             myFarmId.value = newFarm.id;
@@ -2896,7 +2902,9 @@
             await supa.from('messages').insert([{
               room_id: 'farm_room_' + newFarm.id,
               user_id: currentUser.value,
-              text: `🏢 「${newFarm.name}」を設立しました！メンバーを集めてファームを盛り上げましょう！`
+              user_name: 'システム',
+              avatar_badge: '🔧',
+              content: `🏢 「${newFarm.name}」を設立しました！メンバーを集めてファームを盛り上げましょう！`
             }]);
 
             newFirmName.value = '';
