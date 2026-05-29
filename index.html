@@ -2602,6 +2602,8 @@
               .select(`
                 id,
                 status,
+                sender_id,
+                receiver_id,
                 sender:user_profiles!friendships_sender_id_fkey (
                   id, user_name, level, active_badge, unlocked_badges, title
                 ),
@@ -2625,19 +2627,24 @@
                 if (Array.isArray(s)) s = s[0];
                 if (Array.isArray(r)) r = r[0];
 
-                // 自分ではない方のプロフィールを抽出
-                const friendProfile = (s && s.id === myId) ? r : s;
+                // 【完全修正】最上位のsender_idで厳格に判定し「自分ではない方」を抽出
+                const friendProfile = (item.sender_id === myId) ? r : s;
+                
+                if (!friendProfile) {
+                  console.error("フレンドデータの抽出に失敗しました:", item);
+                  return null;
+                }
                 
                 // フォールバック付きで描画用オブジェクトを生成
                 return {
-                  id: friendProfile?.id || 'unknown',
-                  name: friendProfile?.user_name || '不明なユーザー',
+                  id: friendProfile.id || 'unknown',
+                  name: friendProfile.user_name || '不明なユーザー',
                   icon: '👤',
-                  level: friendProfile?.level || 1,
-                  title: friendProfile?.title || 'アソシエイト',
-                  unlocked_badges: friendProfile?.unlocked_badges || []
+                  level: friendProfile.level || 1,
+                  title: friendProfile.title || 'アソシエイト',
+                  unlocked_badges: friendProfile.unlocked_badges || []
                 };
-              });
+              }).filter(Boolean); // nullの要素を安全に除外
             } else {
               friendsList.value = [];
             }
