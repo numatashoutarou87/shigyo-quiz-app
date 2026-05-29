@@ -2722,6 +2722,11 @@
                 setTimeout(() => msg.remove(), 4000);
               }
             })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: `sender_id=eq.${user.id}` }, payload => {
+              // 自分が送った申請が承認された時などにもリストを更新
+              loadPendingRequests();
+              loadFriendsList();
+            })
             .subscribe();
         };
 
@@ -3335,6 +3340,7 @@
         watch([activeTab, firmRoute], () => {
           if (activeTab.value === 'friend') {
             loadPendingRequests();
+            loadFriendsList();
           }
           if (activeTab.value === 'firm' && isFarmMember.value && firmRoute.value === 'chat') {
             firmChat.value = [];
