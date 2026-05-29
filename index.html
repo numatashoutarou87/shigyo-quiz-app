@@ -1017,6 +1017,7 @@
               <header class="header" style="display:flex; justify-content:space-between; align-items:center;">
                 <h2 style="font-size: 16px;">{{ myFarmName || 'マイファーム' }}</h2>
                 <div style="display: flex; gap: 8px;">
+                  <button @click="debugDeleteAllFarms" style="background:#000; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">⚠️ デバッグ：全ファーム削除</button>
                   <button @click="leaveFirm" style="background:#C62828; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">🚪 脱退</button>
                   <button class="member-list-btn" @click="firmRoute = 'members'" style="background:var(--accent-gold); color:var(--primary-navy); border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">👥 メンバー</button>
                 </div>
@@ -3064,12 +3065,15 @@
         const loadFarmMembers = async () => {
           if (!myFarmId.value) return;
           try {
+            console.log('--- loadFarmMembers 実行 ---');
+            console.log('対象ファームID:', myFarmId.value);
+            
             const { data, error } = await supa
               .from('farm_members')
               .select(`
                 user_id,
                 role,
-                user_profiles:user_id (
+                user_profiles (
                   user_name,
                   level,
                   active_badge,
@@ -3078,13 +3082,32 @@
               `)
               .eq('farm_id', myFarmId.value);
 
-            if (data && !error) {
+            if (error) {
+              console.error('メンバー取得エラー詳細:', error);
+              return;
+            }
+
+            console.log('取得データ(Raw):', data);
+
+            if (data) {
               firmMembers.value = data.map(m => {
-                const p = m.user_profiles || {};
+                // 配列で返ってくる場合とオブジェクトで返ってくる場合を両方カバー
+                let p = null;
+                if (Array.isArray(m.user_profiles) && m.user_profiles.length > 0) {
+                  p = m.user_profiles[0];
+                } else if (m.user_profiles && !Array.isArray(m.user_profiles)) {
+                  p = m.user_profiles;
+                }
+                
+                if (!p) {
+                  console.warn('ユーザープロフィールが存在しません:', m);
+                  p = {}; // クラッシュ防止のフォールバック
+                }
+
                 const lv = p.level || 1;
                 const titleIdx = Math.floor((lv - 1) / 5);
                 return {
-                  id: m.user_id, // キック処理等で使う一意識別子
+                  id: m.user_id,
                   farmId: myFarmId.value,
                   role: m.role,
                   name: p.user_name || '名称未設定',
@@ -3094,9 +3117,10 @@
                   intro: p.intro || 'よろしくお願いします！'
                 };
               });
+              console.log('マッピング完了後のメンバー配列:', firmMembers.value);
             }
           } catch (e) {
-            console.error('ファームメンバー取得エラー:', e);
+            console.error('ファームメンバー取得例外エラー:', e);
           }
         };
 
@@ -3284,6 +3308,24 @@
           } catch (e) {
             console.error(e);
             alert('加入処理中にエラーが発生しました。');
+          }
+        };
+
+        const debugDeleteAllFarms = async () => {
+          if (!confirm('【警告】Supabase上のすべてのファーム、ファームメンバー、ファームチャット履歴を完全に削除してリセットしますか？\n※テスト用のデバッグ機能です')) return;
+          try {
+            // farm_room_ で始まるメッセージを削除
+            await supa.from('messages').delete().like('room_id', 'farm_room_%');
+            // farm_members テーブルを全削除
+            await supa.from('farm_members').delete().neq('user_id', '00000000-0000-0000-0000-000000000000');
+            // farms テーブルを全削除
+            await supa.from('farms').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            
+            alert('全ファーム関連データをリセットしました！ページをリロードします。');
+            location.reload();
+          } catch (e) {
+            console.error('全ファーム削除エラー:', e);
+            alert('削除中にエラーが発生しました。');
           }
         };
 
@@ -3599,7 +3641,7 @@
           examQueue, examCurrentIndex, examCurrentQuestion, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
           firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership,
-          firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm, myFarmName,
+          firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm, myFarmName, debugDeleteAllFarms,
           friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge
         };
