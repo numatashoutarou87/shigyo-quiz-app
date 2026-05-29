@@ -938,12 +938,22 @@
                     <div class="friend-level">Lv.{{ user.level }} ・ {{ user.title || 'アソシエイト' }}</div>
                   </div>
                   <button class="primary-btn" 
+                    v-if="isAlreadyFriend(user.id)"
+                    disabled
+                    style="background:#ccc; color:#fff; cursor:not-allowed; padding: 6px 12px; font-size: 11px; width: auto; border: none;"
+                  >フレンド済</button>
+                  <button class="primary-btn" 
+                    v-else-if="requestedFriends.includes(user.id)"
+                    @click="cancelFriendRequest(user.id)"
+                    style="background:#ff7675; color:#fff; cursor:pointer; padding: 6px 12px; font-size: 11px; width: auto; border: none; transition: background 0.2s;"
+                    onmouseover="this.style.background='#d63031'"
+                    onmouseout="this.style.background='#ff7675'"
+                  >申請中 (取消)</button>
+                  <button class="primary-btn" 
+                    v-else
                     @click="sendFriendRequestAPI(user)" 
-                    :disabled="isAlreadyFriend(user.id) || requestedFriends.includes(user.id)" 
-                    :style="(isAlreadyFriend(user.id) || requestedFriends.includes(user.id)) ? 'background:#ccc; color:#fff; cursor:not-allowed; padding: 6px 12px; font-size: 11px; width: auto;' : 'padding: 6px 12px; font-size: 11px; width: auto; background: var(--accent-gold); color: #fff; border: none;'"
-                  >
-                    {{ isAlreadyFriend(user.id) ? 'フレンド済' : (requestedFriends.includes(user.id) ? '申請中' : '申請') }}
-                  </button>
+                    style="padding: 6px 12px; font-size: 11px; width: auto; background: var(--accent-gold); color: #fff; border: none; cursor:pointer;"
+                  >申請</button>
                 </div>
               </div>
             </div>
@@ -2745,6 +2755,30 @@
           }
         };
 
+        const cancelFriendRequest = async (receiverId) => {
+          const { data: { user } } = await supa.auth.getUser();
+          const myId = user ? user.id : null;
+          if (!myId) return;
+
+          try {
+            const { error } = await supa
+              .from('friendships')
+              .delete()
+              .eq('sender_id', myId)
+              .eq('receiver_id', receiverId)
+              .eq('status', 'pending');
+              
+            if (error) {
+              console.error('申請キャンセルエラー:', error);
+              alert('キャンセルの処理に失敗しました。');
+            } else {
+              requestedFriends.value = requestedFriends.value.filter(id => id !== receiverId);
+            }
+          } catch (e) {
+            console.error('申請キャンセル例外:', e);
+          }
+        };
+
         const sendFriendRequestAPI = async (user) => {
           const { data: { user: authUser } } = await supa.auth.getUser();
           const myId = authUser ? authUser.id : null;
@@ -3321,7 +3355,7 @@
           activeTab, studyRoute, profileTab,
           loadStatus, isLoading, paywallConfig, showPaywall,
           
-          userSearchQuery, searchedUsers, isSearching, hasSearched, searchUsers, getDisplayBadge, sendFriendRequestAPI,
+          userSearchQuery, searchedUsers, isSearching, hasSearched, searchUsers, getDisplayBadge, sendFriendRequestAPI, cancelFriendRequest,
           
           masteredBlocks, masteredSubjects, showConfetti, celebrationMessage, celebrationTitle,
           
