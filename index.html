@@ -3248,15 +3248,43 @@
 
 
 
-        const joinFirm = (f) => {
-          isFarmMember.value = true;
-          isFirmOwner.value = false;
-          firmRoute.value = 'chat';
-          checkAndUnlockBadge('badge_farm_02');
-          firmChat.value.push({ sender: 'システム', text: `🏢 「${f.name}」に加入しました！まずは挨拶してみましょう。` });
-          alert(`「${f.name}」に加入しました！`);
-          const el = document.getElementById('firmChatArea');
-          if(el) setTimeout(() => el.scrollTop = el.scrollHeight, 100);
+        const joinFirm = async (f) => {
+          if (!f || !f.id) return;
+          try {
+            // データベースにメンバーとして登録
+            const { error: memberError } = await supa
+              .from('farm_members')
+              .insert([{ farm_id: f.id, user_id: currentUser.value, role: 'member' }]);
+
+            if (memberError) {
+              console.error('ファーム加入エラー:', memberError);
+              alert('加入処理に失敗しました。');
+              return;
+            }
+
+            // ローカルステートを更新
+            myFarmId.value = f.id;
+            myFarmName.value = f.name;
+            isFarmMember.value = true;
+            isFirmOwner.value = false;
+            firmRoute.value = 'chat';
+            
+            checkAndUnlockBadge('badge_farm_02');
+            
+            // システムメッセージをDBに送信
+            await supa.from('messages').insert([{
+              room_id: 'farm_room_' + f.id,
+              user_id: currentUser.value,
+              user_name: 'システム',
+              avatar_badge: '🔧',
+              content: `🏢 「${f.name}」に加入しました！まずは挨拶してみましょう。`
+            }]);
+
+            alert(`「${f.name}」に加入しました！`);
+          } catch (e) {
+            console.error(e);
+            alert('加入処理中にエラーが発生しました。');
+          }
         };
 
 
@@ -3518,7 +3546,7 @@
           { icon: '👨', name: '財務マスター', action: '模試で全国12位にランクインしました！', time: '昨日の 22:00' }
         ]);
 
-        watch([activeTab, firmRoute], () => {
+        watch([activeTab, firmRoute, myFarmId], () => {
           if (activeTab.value === 'friend') {
             loadPendingRequests();
             loadFriendsList();
