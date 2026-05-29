@@ -779,7 +779,7 @@
             
             <div v-else-if="studyRoute === 'quiz'" class="quiz-screen screen">
               <header class="header" style="padding: 10px 20px;">
-                <button class="back-btn" @click="triggerInterstitial(() => { studyRoute = 'rooms'; if(activeRoom) activeRoom.count--; })" style="font-size:12px;">← 中断</button>
+                <button class="back-btn" @click="triggerInterstitial(() => { studyRoute = 'rooms'; if(activeRoom) updateMyRoomPresence(null); })" style="font-size:12px;">← 中断</button>
                 <h2 style="font-size:14px;">{{ activeRoom?.name }}</h2>
                 <div style="font-size: 12px; font-weight: bold; color: var(--text-sub);">{{ currentQuestionIndex + 1 }} / {{ quizQueue.length }}</div>
               </header>
@@ -813,7 +813,7 @@
                     <div class="result-card">
                       <h2 style="color:var(--primary-navy); margin-bottom:16px;">セッション完了</h2>
                       <div style="font-size: 16px; margin-bottom: 20px;">正解数: <span style="font-size:24px; color:var(--accent-gold); font-weight:bold;">{{ correctCount }}</span> / {{ quizQueue.length }}</div>
-                      <button class="primary-btn" @click="triggerInterstitial(() => { studyRoute = 'rooms'; activeRoom.count--; })">ロビーへ戻る</button>
+                      <button class="primary-btn" @click="triggerInterstitial(() => { studyRoute = 'rooms'; updateMyRoomPresence(null); })">ロビーへ戻る</button>
                     </div>
                   </div>
                 </main>
@@ -1347,15 +1347,43 @@
         const generateRooms = () => {
           const rooms = [];
           for (let i = 1; i <= 10; i++) {
-            rooms.push({ id: `silent_${i}`, type: 'silent', name: `サイレント自習室 ${i}号室`, capacity: 50, count: Math.floor(Math.random() * 51) });
+            rooms.push({ id: `silent_${i}`, type: 'silent', name: `サイレント自習室 ${i}号室`, capacity: 50, count: 0 });
           }
           for (let i = 1; i <= 20; i++) {
-            rooms.push({ id: `chat_${i}`, type: 'chat', name: `チャット推奨室 ${i}号室`, capacity: 30, count: Math.floor(Math.random() * 31) });
+            rooms.push({ id: `chat_${i}`, type: 'chat', name: `チャット推奨室 ${i}号室`, capacity: 30, count: 0 });
           }
           return rooms;
         };
 
         const STUDY_ROOMS = ref(generateRooms());
+
+        let globalPresenceChannel = null;
+        const initRoomPresence = () => {
+          if (globalPresenceChannel) return;
+          globalPresenceChannel = supa.channel('global_lobby_presence', {
+            config: { presence: { key: currentUser.value } }
+          });
+          globalPresenceChannel.on('presence', { event: 'sync' }, () => {
+            const state = globalPresenceChannel.presenceState();
+            const counts = {};
+            for (const key in state) {
+              const presences = state[key];
+              if (presences && presences.length > 0) {
+                const p = presences[presences.length - 1];
+                if (p.room_id) counts[p.room_id] = (counts[p.room_id] || 0) + 1;
+              }
+            }
+            STUDY_ROOMS.value.forEach(r => {
+              r.count = counts[r.id] || 0;
+            });
+          }).subscribe();
+        };
+
+        const updateMyRoomPresence = (roomId) => {
+          if (globalPresenceChannel && currentUser.value) {
+            globalPresenceChannel.track({ room_id: roomId });
+          }
+        };
         const lobbyActiveTab = ref('silent');
         const expandedSubject = ref(null);
         
@@ -1447,6 +1475,7 @@
           if (!currentUser.value || !app_users[currentUser.value]) return;
           const u = app_users[currentUser.value];
           isPremium.value = u.isPremium || false;
+          initRoomPresence();
           displayName.value = u.displayName || currentUser.value;
           
           const todayStr = new Date().toDateString();
@@ -2244,7 +2273,7 @@
             return;
           }
           activeRoom.value = room;
-          room.count++;
+          updateMyRoomPresence(room.id);
           if (room.type === 'chat') {
             const el = document.getElementById('studyLogs');
             if (el) el.innerHTML = '';
