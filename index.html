@@ -514,9 +514,7 @@
         <button class="primary-btn" @click="sendFriendRequest(activeFirmMember)" :disabled="isAlreadyFriend(activeFirmMember?.id) || requestedFriends.includes(activeFirmMember?.id)" :style="isAlreadyFriend(activeFirmMember?.id) || requestedFriends.includes(activeFirmMember?.id) ? 'background:#ccc; color:#fff;' : 'background:var(--accent-gold); color:var(--primary-navy);'">
           {{ isAlreadyFriend(activeFirmMember?.id) ? 'フレンド登録済み' : (requestedFriends.includes(activeFirmMember?.id) ? '申請中' : 'フレンド申請する') }}
         </button>
-        <button v-if="isFirmOwner && activeFirmMember?.farmId === myFarmId" class="primary-btn" @click="transferOwnership(activeFirmMember)" style="background:#d35400; color:white; margin-top:10px;">👑 設立者権限を移譲する</button>
-        <button v-if="isFirmOwner && activeFirmMember?.farmId === myFarmId && activeFirmMember?.id !== currentUser" class="primary-btn" @click="kickFirmMember(activeFirmMember)" style="background:#C62828; color:white; margin-top:10px;">❌ ファームから脱退させる</button>
-        <button class="badge-modal-close" @click="showMemberProfileModal = false; activeFirmMember = null" style="background:var(--text-sub); margin-top:10px;">閉じる</button>
+        <button class="badge-modal-close" @click="showMemberProfileModal = false; activeFirmMember = null" style="background:var(--primary-navy); color:white; margin-top:15px;">閉じる</button>
       </div>
     </div>
 
@@ -3436,38 +3434,7 @@
         };
 
 
-        
-        const kickFirmMember = async (m) => {
-          if (confirm(`本当に ${m.name} さんをファームから強制脱退させますか？`)) {
-            try {
-              const { error } = await supa
-                .from('farm_members')
-                .delete()
-                .eq('user_id', m.id)
-                .eq('farm_id', myFarmId.value);
-              if (!error) {
-                firmMembers.value = firmMembers.value.filter(member => member.id !== m.id);
-                showMemberProfileModal.value = false;
-                activeFirmMember.value = null;
-                alert(`${m.name} さんを強制脱退させました。`);
-              } else {
-                alert('キック処理に失敗しました。');
-              }
-            } catch (e) {
-              console.error('キックエラー:', e);
-            }
-          }
-        };
 
-        const transferOwnership = (m) => {
-          if (confirm(`本当に ${m.name} さんにファームの設立者権限を移譲しますか？\nあなたの権限は一般メンバーに降格します。`)) {
-            isFirmOwner.value = false;
-            showMemberProfileModal.value = false;
-            activeFirmMember.value = null;
-            alert(`${m.name} さんに設立者権限を移譲しました。`);
-          }
-        };
-        
         const editDisplayName = () => {
           const newName = prompt('新しいユーザー名を入力してください (最大12文字)', displayName.value);
           if (newName !== null) {
@@ -3749,7 +3716,7 @@
           examCountdownString, isExamLive, startMockExam,
           examQueue, examCurrentIndex, examCurrentQuestion, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
-          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership, openFarmMembers, dissolveFarm, dissolveFarm,
+          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, openFarmMembers, dissolveFarm,
           firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm, myFarmName, debugDeleteAllFarms,
           friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge
