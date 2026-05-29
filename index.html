@@ -2700,13 +2700,13 @@
         };
 
         let friendReqSub = null;
+        let chatSub = null;
         const setupRealtimeFriendships = async () => {
           const { data: { user } } = await supa.auth.getUser();
           if (!user) return;
           
-          if (friendReqSub) {
-            supa.removeChannel(friendReqSub);
-          }
+          if (friendReqSub) supa.removeChannel(friendReqSub);
+          if (chatSub) supa.removeChannel(chatSub);
           
           friendReqSub = supa
             .channel('friendships_channel')
@@ -2726,6 +2726,57 @@
               // 自分が送った申請が承認された時などにもリストを更新
               loadPendingRequests();
               loadFriendsList();
+            })
+            .subscribe();
+
+          chatSub = supa
+            .channel('friend_messages_channel')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friend_messages', filter: `receiver_id=eq.${user.id}` }, payload => {
+               // 相手から新しいメッセージが届いた
+               const msg = payload.new;
+               const fid = msg.sender_id;
+               if (!directChats.value[fid]) directChats.value[fid] = [];
+               
+               const timeStr = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+               directChats.value[fid].push({
+                 id: msg.id,
+                 sender: 'friend',
+                 text: msg.message,
+                 time: timeStr,
+                 reactions: {}
+               });
+               
+               // チャット画面を開いている場合は自動スクロール
+               if (activeFriend.value && activeFriend.value.id === fid && friendRoute.value === 'chat') {
+                 setTimeout(() => {
+                   const el = document.getElementById('directChatArea');
+                   if (el) el.scrollTop = el.scrollHeight;
+                 }, 100);
+               }
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friend_messages', filter: `sender_id=eq.${user.id}` }, payload => {
+               // 別タブ等の自分が送信したメッセージの同期
+               const msg = payload.new;
+               const fid = msg.receiver_id;
+               if (!directChats.value[fid]) directChats.value[fid] = [];
+               
+               // 既にローカル反映済み（重複）ならスキップ
+               if (!directChats.value[fid].find(m => m.id === msg.id)) {
+                 const timeStr = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                 directChats.value[fid].push({
+                   id: msg.id,
+                   sender: 'me',
+                   text: msg.message,
+                   time: timeStr,
+                   reactions: {}
+                 });
+                 if (activeFriend.value && activeFriend.value.id === fid && friendRoute.value === 'chat') {
+                   setTimeout(() => {
+                     const el = document.getElementById('directChatArea');
+                     if (el) el.scrollTop = el.scrollHeight;
+                   }, 100);
+                 }
+               }
             })
             .subscribe();
         };
@@ -3268,16 +3319,54 @@
           }
         };
 
+        const loadMessages = async (friendId) => {
+          const { data: { user } } = await supa.auth.getUser();
+          const myId = user ? user.id : null;
+          if (!myId) return;
+
+          try {
+            const { data, error } = await supa
+              .from('friend_messages')
+              .select('*')
+              .or(`and(sender_id.eq.${myId},receiver_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${myId})`)
+              .order('created_at', { ascending: true });
+
+            if (error) {
+              console.error('メッセージロードエラー:', error.message);
+              return;
+            }
+            
+            if (data) {
+              directChats.value[friendId] = data.map(msg => {
+                const timeStr = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                return {
+                  id: msg.id,
+                  sender: msg.sender_id === myId ? 'me' : 'friend',
+                  text: msg.message,
+                  time: timeStr,
+                  reactions: {}
+                };
+              });
+            } else {
+              directChats.value[friendId] = [];
+            }
+            
+            setTimeout(() => {
+              const el = document.getElementById('directChatArea');
+              if (el) el.scrollTop = el.scrollHeight;
+            }, 100);
+          } catch (e) {
+            console.error('メッセージロード例外:', e);
+          }
+        };
+
         const openDirectChat = (f) => {
           activeFriend.value = f;
           friendRoute.value = 'chat';
-          setTimeout(() => {
-            const el = document.getElementById('directChatArea');
-            if (el) el.scrollTop = el.scrollHeight;
-          }, 100);
+          loadMessages(f.id);
         };
 
-        const sendDirectChat = () => {
+        const sendDirectChat = async () => {
           if (!canSendChat.value) {
             showPaywall('チャット送信枠の上限', '無料プランでの送信は1日10回までです。プレミアムに加入しましょう！');
             return;
@@ -3290,44 +3379,47 @@
           
           if (activeFriend.value) {
             const fid = activeFriend.value.id;
-            if (!directChats.value[fid]) {
-              directChats.value[fid] = [];
-            }
-            directChats.value[fid].push({
-              sender: 'me',
-              text: directChatInput.value,
-              time: getFormattedTime(),
-              reactions: {}
-            });
-            if (directChats.value[fid].length > 50) {
-              directChats.value[fid] = directChats.value[fid].slice(-50);
-            }
-            chatCount.value++;
-            directChatInput.value = '';
+            const text = directChatInput.value.trim();
+            directChatInput.value = ''; // 入力欄をすぐに空にする
             
-            setTimeout(() => {
-              const el = document.getElementById('directChatArea');
-              if (el) el.scrollTop = el.scrollHeight;
-            }, 100);
+            const { data: { user } } = await supa.auth.getUser();
+            const myId = user ? user.id : null;
+            if (!myId) return;
             
-            // Dummy reply
-            setTimeout(() => {
-              if (directChats.value[fid]) {
+            try {
+              const { data, error } = await supa
+                .from('friend_messages')
+                .insert([{
+                  sender_id: myId,
+                  receiver_id: fid,
+                  message: text
+                }])
+                .select()
+                .single();
+                
+              if (error) {
+                console.error('メッセージ送信エラー:', error.message);
+                alert('送信に失敗しました。');
+              } else if (data) {
+                if (!directChats.value[fid]) directChats.value[fid] = [];
+                const timeStr = new Date(data.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 directChats.value[fid].push({
-                  sender: 'friend',
-                  text: '返信テストです。',
-                  time: getFormattedTime(),
+                  id: data.id,
+                  sender: 'me',
+                  text: data.message,
+                  time: timeStr,
                   reactions: {}
                 });
-                if (directChats.value[fid].length > 50) {
-                  directChats.value[fid] = directChats.value[fid].slice(-50);
-                }
+                chatCount.value++;
+                
                 setTimeout(() => {
                   const el = document.getElementById('directChatArea');
                   if (el) el.scrollTop = el.scrollHeight;
                 }, 100);
               }
-            }, 2000);
+            } catch (e) {
+              console.error('メッセージ送信例外:', e);
+            }
           }
         };
 
