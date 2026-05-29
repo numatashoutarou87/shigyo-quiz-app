@@ -2635,7 +2635,12 @@
           try {
             const { data, error } = await supa
               .from('friendships')
-              .select('*, sender_profile:user_profiles!friendships_sender_id_fkey(*)')
+              .select(`
+                *,
+                sender_profile:user_profiles!friendships_sender_id_fkey (
+                  id, user_name, level, active_badge, unlocked_badges, title
+                )
+              `)
               .eq('receiver_id', myId)
               .eq('status', 'pending');
               
@@ -2648,7 +2653,15 @@
                 // Supabaseからの結合結果が配列になる場合と単体オブジェクトになる場合を吸収
                 let profile = req.sender_profile;
                 if (Array.isArray(profile)) profile = profile[0];
-                return { ...req, sender_profile: profile || { user_name: '不明なユーザー' } };
+                return { 
+                  ...req, 
+                  sender_profile: profile || { 
+                    user_name: profile?.user_name || '不明なユーザー',
+                    level: profile?.level || 1,
+                    title: profile?.title || 'アソシエイト',
+                    unlocked_badges: profile?.unlocked_badges || []
+                  } 
+                };
               });
             } else {
               pendingRequests.value = [];
