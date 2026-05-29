@@ -2853,7 +2853,7 @@
 
         const sendFriendRequest = (m) => {
           if (!m || isAlreadyFriend(m.id) || requestedFriends.value.includes(m.id)) return;
-          requestedFriends.value.push(m.id);
+          sendFriendRequestAPI(m);
         };
 
         const userSearchQuery = ref('');
