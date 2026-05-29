@@ -2674,7 +2674,6 @@
         const hasSearched = ref(false);
 
         const searchUsers = async () => {
-          // 1. 入力文字のクリーンアップ（不要な空白の自動除去）
           const keyword = userSearchQuery.value.trim();
           if (!keyword) return;
 
@@ -2683,24 +2682,21 @@
           searchedUsers.value = [];
 
           try {
-            const myId = currentUser.value;
             const { data, error } = await supa
               .from('user_profiles')
-              .select('id, user_name, level, title, unlocked_badges')
-              // 2. カラム名エラーを回避し、user_name単一での確実な部分一致に変更
-              .ilike('user_name', `%${keyword}%`)
-              // 3. 自分自身を検索結果から除外する安全ロジック
-              .neq('id', myId)
-              .limit(30);
+              .select('*')
+              .ilike('user_name', `%${keyword}%`);
+
+            alert(`【デバッグ】検索文字: "${keyword}"\n取得件数: ${data ? data.length : 0}件\nエラー: ${error ? JSON.stringify(error) : 'なし'}\nデータ内容: ${JSON.stringify(data || []).substring(0, 200)}`);
 
             if (error) {
               console.error("ユーザー検索エラー詳細:", error);
-              alert('検索エラー: ' + error.message);
             } else if (data) {
               searchedUsers.value = data;
             }
           } catch (e) {
             console.error('ユーザー検索エラー:', e);
+            alert(`【例外エラー】\n${e.message}`);
           } finally {
             isSearching.value = false;
           }
