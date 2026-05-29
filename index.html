@@ -871,6 +871,27 @@
                   <button class="primary-btn" @click="friendRoute = 'search'" style="width: auto; padding: 0 15px; margin: 0;">ユーザー検索 🔍</button>
                 </div>
               </div>
+              <!-- 届いた申請エリア -->
+              <div v-if="pendingRequests.length > 0" class="pending-requests-area" style="margin-bottom: 20px;">
+                <h3 style="font-size: 14px; margin-bottom: 10px; color: var(--accent-gold);">届いたフレンド申請 ({{ pendingRequests.length }}件)</h3>
+                <div class="friend-list">
+                  <div class="friend-item" v-for="req in pendingRequests" :key="req.id">
+                    <div class="friend-icon">👤</div>
+                    <div class="friend-info">
+                      <div class="friend-name">
+                        <span style="color:var(--accent-gold); font-size:12px; margin-right:4px;">[{{ getDisplayBadge(req.sender_profile?.unlocked_badges) }}]</span>
+                        {{ req.sender_profile?.user_name || '取得中...' }}
+                      </div>
+                      <div class="friend-level">Lv.{{ req.sender_profile?.level || 1 }} ・ {{ req.sender_profile?.title || 'アソシエイト' }}</div>
+                    </div>
+                    <div style="display:flex; gap: 5px;">
+                      <button class="primary-btn" @click="acceptFriendRequest(req.id)" style="padding: 6px 10px; font-size: 11px; width: auto; background: var(--accent-gold);">承認</button>
+                      <button class="secondary-btn" @click="rejectFriendRequest(req.id)" style="padding: 6px 10px; font-size: 11px; width: auto; background: #666; border: none; color: white;">拒否</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div v-if="filteredFriends.length === 0" style="text-align: center; color: #888; margin-top: 40px;">
                 フレンドが見つかりません
               </div>
@@ -1278,6 +1299,7 @@
             await syncUserProfile(currentUser.value);
             // 既存セッション（自動ログイン）時にも強制upsertしてプロフィールを確実化
             saveUserProfile(true);
+            await loadPendingRequests();
             authScreen.value = 'app';
           }
         });
@@ -1930,6 +1952,7 @@
           await syncUserProfile(currentUser.value);
           // 新規ユーザー対策：ログイン直後にプロフィールを強制upsertして検索可能にする
           saveUserProfile(true);
+          await loadPendingRequests();
           
           activeMode.value = null;
           authScreen.value = 'app';
@@ -1981,6 +2004,7 @@
           await syncUserProfile(currentUser.value);
           // 新規ユーザー対策：登録直後にプロフィールを強制upsertして検索可能にする
           saveUserProfile(true);
+          await loadPendingRequests();
           
           activeMode.value = null;
           authScreen.value = 'app';
@@ -2464,6 +2488,130 @@
         const getFormattedTime = () => {
           const d = new Date();
           return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+        };
+
+        const searchUsers = async () => {
+          const keyword = userSearchQuery.value.trim();
+          if (!keyword) return;
+
+          isSearching.value = true;
+          hasSearched.value = true;
+          searchedUsers.value = [];
+
+          try {
+            const { data, error } = await supa
+              .from('user_profiles')
+              .select('*')
+              .ilike('user_name', `%${keyword}%`);
+
+            if (error) {
+              console.error("ユーザー検索エラー詳細:", error);
+            } else if (data) {
+              searchedUsers.value = data;
+            }
+          } catch (e) {
+            console.error('ユーザー検索エラー:', e);
+          } finally {
+            isSearching.value = false;
+          }
+        };
+
+        const getDisplayBadge = (badges) => {
+          if (!badges || badges.length === 0) return '🔰 新人';
+          return badges[badges.length - 1] || '🔰 新人';
+        };
+
+        const pendingRequests = ref([]);
+        
+        const loadPendingRequests = async () => {
+          if (!currentUser.value) return;
+          try {
+            const { data, error } = await supa
+              .from('friendships')
+              .select('*')
+              .eq('receiver_id', currentUser.value)
+              .eq('status', 'pending');
+              
+            if (error) {
+              console.error('申請一覧ロードエラー:', error.message);
+              return;
+            }
+            if (data && data.length > 0) {
+              const senderIds = data.map(req => req.sender_id);
+              const { data: profiles, error: pError } = await supa
+                .from('user_profiles')
+                .select('*')
+                .in('id', senderIds);
+                
+              if (!pError && profiles) {
+                pendingRequests.value = data.map(req => {
+                  const p = profiles.find(profile => profile.id === req.sender_id);
+                  return { ...req, sender_profile: p || { user_name: '不明なユーザー' } };
+                });
+                return;
+              }
+            }
+            pendingRequests.value = [];
+          } catch (e) {
+            console.error('申請一覧ロード例外:', e);
+          }
+        };
+
+        const acceptFriendRequest = async (requestId) => {
+          try {
+            const { error } = await supa
+              .from('friendships')
+              .update({ status: 'accepted' })
+              .eq('id', requestId);
+            
+            if (error) {
+              alert('承認エラー: ' + error.message);
+            } else {
+              alert('フレンドになりました！');
+              await loadPendingRequests();
+            }
+          } catch (e) {
+            console.error('承認処理例外:', e);
+          }
+        };
+
+        const rejectFriendRequest = async (requestId) => {
+          try {
+            const { error } = await supa
+              .from('friendships')
+              .delete()
+              .eq('id', requestId);
+              
+            if (error) {
+              alert('拒否エラー: ' + error.message);
+            } else {
+              await loadPendingRequests();
+            }
+          } catch (e) {
+            console.error('拒否処理例外:', e);
+          }
+        };
+
+        const sendFriendRequestAPI = async (user) => {
+          if (!currentUser.value) return;
+          try {
+            const { error } = await supa
+              .from('friendships')
+              .insert([{
+                sender_id: currentUser.value,
+                receiver_id: user.id,
+                status: 'pending'
+              }]);
+              
+            if (error) {
+              alert('申請エラー: ' + error.message);
+            } else {
+              alert(`${user.user_name} にフレンド申請を送りました！`);
+              requestedFriends.value.push(user.id);
+            }
+          } catch (e) {
+            console.error('申請送信例外:', e);
+          }
         };
 
         const studyLogs = ref([]);
@@ -3036,7 +3184,7 @@
 
           firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership,
           firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, filteredDummyFirms, joinFirm, createFirm, leaveFirm,
-          friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat,
+          friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest, rejectFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge,
           STAMPS, showReactionPopup, toggleReaction
         };
