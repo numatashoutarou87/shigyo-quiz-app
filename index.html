@@ -3185,12 +3185,40 @@
           alert(`現在のモードにダミーフレンドを${count}人追加しました。`);
         };
 
-        const removeFriend = (friend) => {
-          if (confirm(`${friend.name}さんのフレンド登録を解除しますか？\n※これまでのチャット履歴も削除されます。`)) {
+        const removeFriend = async (friend) => {
+          if (!confirm(`${friend.name}さんのフレンド登録を解除しますか？\n※これまでのチャット履歴も削除されます。`)) return;
+          
+          const { data: { user } } = await supa.auth.getUser();
+          const myId = user ? user.id : null;
+          if (!myId) return;
+
+          try {
+            // friendshipsテーブルから対象関係を双方向で完全に削除
+            const { error } = await supa
+              .from('friendships')
+              .delete()
+              .or(`and(sender_id.eq.${myId},receiver_id.eq.${friend.id}),and(sender_id.eq.${friend.id},receiver_id.eq.${myId})`);
+
+            if (error) {
+              console.error('フレンド解除エラー:', error);
+              alert('フレンド解除に失敗しました。');
+              return;
+            }
+
+            // フロントエンドのUIから即座に消去
             friendsList.value = friendsList.value.filter(f => f.id !== friend.id);
+            
+            // 申請履歴（requestedFriends）から対象のIDを削除して、再度「申請」ボタンを押せるようにリセット
+            requestedFriends.value = requestedFriends.value.filter(id => id !== friend.id);
+            
+            // チャット履歴の削除（ローカル用）
             if (directChats.value[friend.id]) {
               delete directChats.value[friend.id];
             }
+            
+            alert(`${friend.name}さんとのフレンド関係を解除しました。`);
+          } catch (e) {
+            console.error('フレンド解除処理例外:', e);
           }
         };
 
