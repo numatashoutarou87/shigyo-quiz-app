@@ -2833,48 +2833,7 @@
         };
 
         const studyLogs = ref([]);
-        const farmsList = ref([]);
 
-        const loadInitialFarms = async () => {
-          try {
-            const { data, error } = await supa
-              .from('farms')
-              .select('*')
-              .order('created_at', { ascending: false });
-            if (data && !error) {
-              farmsList.value = data;
-            }
-          } catch (e) {
-            console.error('ファーム取得エラー:', e);
-          }
-        };
-
-        const searchFarms = async () => {
-          const keyword = firmSearchQuery.value.trim();
-          if (!keyword) {
-            await loadInitialFarms();
-            return;
-          }
-          try {
-            const { data, error } = await supa
-              .from('farms')
-              .select('*')
-              .or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%`)
-              .order('created_at', { ascending: false });
-            if (data && !error) {
-              farmsList.value = data;
-            }
-          } catch (e) {
-            console.error('ファーム検索エラー:', e);
-          }
-        };
-
-        watch(firmSearchQuery, () => {
-          searchFarms();
-        });
-
-        // 初期ロード
-        loadInitialFarms();
 
         const DUMMY_STUDY_USERS = [
           { id: 'su_1', farmId: 'other_farm', name: 'アソシエイトA', level: 12, title: 'アソシエイト', badge: '🔰 新人', intro: 'よろしくお願いします！' },
@@ -3170,6 +3129,49 @@
         const firmSearchQuery = ref('');
         const newFirmName = ref('');
         const newFirmIntro = ref('');
+
+        const farmsList = ref([]);
+
+        const loadInitialFarms = async () => {
+          try {
+            const { data, error } = await supa
+              .from('farms')
+              .select('*')
+              .order('created_at', { ascending: false });
+            if (data && !error) {
+              farmsList.value = data;
+            }
+          } catch (e) {
+            console.error('ファーム取得エラー:', e);
+          }
+        };
+
+        const searchFarms = async () => {
+          const keyword = firmSearchQuery.value.trim();
+          if (!keyword) {
+            await loadInitialFarms();
+            return;
+          }
+          try {
+            const { data, error } = await supa
+              .from('farms')
+              .select('*')
+              .or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%`)
+              .order('created_at', { ascending: false });
+            if (data && !error) {
+              farmsList.value = data;
+            }
+          } catch (e) {
+            console.error('ファーム検索エラー:', e);
+          }
+        };
+
+        watch(firmSearchQuery, () => {
+          searchFarms();
+        });
+
+        // 初期ロード
+        loadInitialFarms();
 
 
 
