@@ -1015,7 +1015,7 @@
             
             <div v-else-if="firmRoute === 'chat'" class="firm-chat-screen" style="display:flex; flex-direction:column; height:100%;">
               <header class="header" style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="font-size: 16px;">マイファーム</h2>
+                <h2 style="font-size: 16px;">{{ myFarmName || 'マイファーム' }}</h2>
                 <div style="display: flex; gap: 8px;">
                   <button @click="leaveFirm" style="background:#C62828; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">🚪 脱退</button>
                   <button class="member-list-btn" @click="firmRoute = 'members'" style="background:var(--accent-gold); color:var(--primary-navy); border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">👥 メンバー</button>
@@ -1297,6 +1297,7 @@
         const isFarmMember = ref(true);
         const isFirmOwner = ref(false);
         const myFarmId = ref('f_123');
+        const myFarmName = ref('');
         const totalExp = ref(0);
         
         const dailyCorrect = ref(0);
@@ -2859,6 +2860,54 @@
           }
         };
 
+        const createFirm = async () => {
+          const fn = newFirmName.value.trim();
+          const fi = newFirmIntro.value.trim();
+          if (!fn) return;
+
+          try {
+            // 1. ファームをデータベースに登録
+            const { data: newFarm, error: farmError } = await supa
+              .from('farms')
+              .insert([{ name: fn, description: fi, members: 1 }])
+              .select()
+              .single();
+
+            if (farmError) throw farmError;
+
+            // 2. 自分を設立者(leader)として登録
+            const { error: memberError } = await supa
+              .from('farm_members')
+              .insert([{ farm_id: newFarm.id, user_id: currentUser.value, role: 'leader' }]);
+
+            if (memberError) throw memberError;
+
+            // ローカルステートの更新
+            myFarmId.value = newFarm.id;
+            myFarmName.value = newFarm.name;
+            isFarmMember.value = true;
+            isFirmOwner.value = true;
+            firmRoute.value = 'chat';
+            
+            checkAndUnlockBadge('badge_farm_01');
+            alert('🏢 ファームを設立しました！');
+            
+            // 初回チャットの送信（システムメッセージ）
+            await supa.from('messages').insert([{
+              room_id: 'farm_room_' + newFarm.id,
+              user_id: currentUser.value,
+              text: `🏢 「${newFarm.name}」を設立しました！メンバーを集めてファームを盛り上げましょう！`
+            }]);
+
+            newFirmName.value = '';
+            newFirmIntro.value = '';
+            
+          } catch (e) {
+            console.error('ファーム作成エラー:', e);
+            alert('ファームの設立に失敗しました。');
+          }
+        };
+
         const openStudyUserProfile = async (u) => {
           if (!u || !u.id) return;
           try {
@@ -3202,21 +3251,7 @@
           if(el) setTimeout(() => el.scrollTop = el.scrollHeight, 100);
         };
 
-        const createFirm = () => {
-          if (!newFirmName.value.trim()) return;
-          isFarmMember.value = true;
-          isFirmOwner.value = true;
-          firmRoute.value = 'chat';
-          
-          checkAndUnlockBadge('badge_farm_01');
-          alert('🎉 ファームを設立しました！');
-          
-          firmChat.value = [
-            { sender: 'システム', text: `🏢 あなたが「${newFirmName.value}」を設立しました！メンバーを募集してファームを盛り上げましょう！` }
-          ];
-          newFirmName.value = '';
-          newFirmIntro.value = '';
-        };
+
         
         const kickFirmMember = async (m) => {
           if (confirm(`本当に ${m.name} さんをファームから強制脱退させますか？`)) {
@@ -3528,7 +3563,7 @@
           examQueue, examCurrentIndex, examCurrentQuestion, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
           firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership,
-          firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm,
+          firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm, myFarmName,
           friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge
         };
