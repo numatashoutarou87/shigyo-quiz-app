@@ -3157,6 +3157,20 @@
         const initFarmMembersSubscription = () => {
           supa.channel('public:farm_members')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_members' }, payload => {
+              // 自分が削除された（ファーム解散など）かを検知
+              if (payload.eventType === 'DELETE' && payload.old?.user_id === currentUser.value) {
+                console.log("所属ファームの解散を検知しました。");
+                alert("所属していたファームが解散されました。ホーム（ロビー）へ戻ります。");
+                // グローバル変数の初期化と画面の強制切り替え
+                isFarmMember.value = false;
+                isFirmOwner.value = false;
+                firmJoinRoute.value = 'lobby';
+                firmChat.value = [];
+                myFarmId.value = '';
+                myFarmName.value = '';
+                return; // ここで処理を終了
+              }
+
               const affectedFarm = payload.new?.farm_id || payload.old?.farm_id;
               if (affectedFarm === myFarmId.value) {
                 console.log('ファームメンバーの増減を検知しました。自動更新します。');
