@@ -3154,28 +3154,53 @@
         };
 
         // メンバー一覧のリアルタイム自動更新を仕掛ける
+        // メンバー一覧のリアルタイム自動更新と解散・脱退時の強制送還を仕掛ける
         const initFarmMembersSubscription = () => {
-          supa.channel('public:farm_members')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_members' }, payload => {
-              // 自分が削除された（ファーム解散など）かを検知
-              if (payload.eventType === 'DELETE' && payload.old?.user_id === currentUser.value) {
-                console.log("所属ファームの解散を検知しました。");
-                alert("所属していたファームが解散されました。ホーム（ロビー）へ戻ります。");
-                // グローバル変数の初期化と画面の強制切り替え
+          supa.channel('farm_membership_global_changes')
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'farm_members' }, async (payload) => {
+              console.log("【リアルタイム検知】メンバー行の削除（DELETE）をキャッチしました:", payload);
+              
+              const myId = currentUser.value; // すでに認証済みの自分自身のID
+              const deletedUser = payload.old ? payload.old.user_id : null;
+              const deletedFarm = payload.old ? payload.old.farm_id : null;
+
+              // 🚨 【超確実な判定】
+              // 消された行の user_id が「自分」であるか、
+              // または消された行の farm_id が「今自分が開いているファームID」と一致する場合、強制送還を発動！
+              if (deletedUser === myId || (myFarmId.value && deletedFarm === myFarmId.value)) {
+                
+                // 二重発火を防ぐガード（すでに画面が切り替わっていればスルー）
+                if (firmJoinRoute.value === 'lobby' && !isFarmMember.value) return;
+
+                alert("所属していたファームが解散されたか、脱退しました。初期画面へ戻ります。");
+                
+                // グローバル変数の完全初期化
                 isFarmMember.value = false;
                 isFirmOwner.value = false;
-                firmJoinRoute.value = 'lobby';
                 firmChat.value = [];
                 myFarmId.value = '';
                 myFarmName.value = '';
-                return; // ここで処理を終了
-              }
 
-              const affectedFarm = payload.new?.farm_id || payload.old?.farm_id;
-              if (affectedFarm === myFarmId.value) {
-                console.log('ファームメンバーの増減を検知しました。自動更新します。');
+                // 100%確実に「ファームを探す/作る」画面（未所属画面）へ切り替える
+                firmJoinRoute.value = 'lobby';
+                
+                // 最悪の場合に備えて、状態がリセットされていなければ完全に真っ白状態から復帰させるためのリロード（力技のフォールバック）
+                setTimeout(() => {
+                  if (myFarmId.value !== '') {
+                    location.reload(); 
+                  }
+                }, 500);
+              } else if (deletedFarm === myFarmId.value) {
+                // 他の人が抜けた場合はメンバー一覧を更新
                 loadFarmMembers();
               }
+            })
+            // INSERTやUPDATEなど他の人が出入りした場合も更新する
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'farm_members' }, payload => {
+              if (payload.new?.farm_id === myFarmId.value) loadFarmMembers();
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'farm_members' }, payload => {
+              if (payload.new?.farm_id === myFarmId.value) loadFarmMembers();
             })
             .subscribe();
         };
