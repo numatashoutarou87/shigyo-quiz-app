@@ -3063,15 +3063,51 @@
         const firmMembers = ref([]);
 
         const loadFarmMembers = async () => {
-          if (!myFarmId.value) return;
           try {
-            console.log('--- loadFarmMembers 実行 ---');
+            console.log('--- loadFarmMembers 実行（強制取得モード） ---');
             
+            let targetFarmId = myFarmId.value;
+
+            // 🚨 【超重要バックアップ策】もし targetFarmId が正常に取得できていない場合、
+            // ログイン中の自分のIDを元に、所属しているファームIDを逆引きして上書きする
+            if (!targetFarmId || targetFarmId === 'undefined' || targetFarmId === 'null') {
+              console.log("ファームIDが不正なため、自分の所属から逆引きします");
+              
+              // 万全を期すため、Supabaseから直接現在の認証ユーザーIDを取得
+              const authRes = await supa.auth.getUser();
+              const realUserId = authRes.data.user?.id || currentUser.value;
+
+              const { data: myMembership } = await supa
+                .from('farm_members')
+                .select('farm_id')
+                .eq('user_id', realUserId)
+                .limit(1)
+                .single();
+              
+              if (myMembership) {
+                targetFarmId = myMembership.farm_id;
+                myFarmId.value = targetFarmId; // Vueステートも合わせて復旧させる
+              }
+            }
+
+            // 文字列の余計な空白やクォーテーションをトリミングして綺麗にする
+            if (typeof targetFarmId === 'string') {
+              targetFarmId = targetFarmId.replace(/['"]/g, '').trim();
+            }
+
+            console.log("最終的に使用するファームID:", targetFarmId);
+
+            if (!targetFarmId) {
+              console.warn("逆引きでもファームが見つかりませんでした。");
+              firmMembers.value = [];
+              return;
+            }
+
             // 1. 現在のファームIDに所属するメンバーを単純取得
             const { data: members, error: mError } = await supa
               .from('farm_members')
               .select('user_id, role')
-              .eq('farm_id', myFarmId.value);
+              .eq('farm_id', targetFarmId);
 
             if (mError || !members || members.length === 0) {
               firmMembers.value = [];
@@ -3102,7 +3138,7 @@
               const titleIdx = Math.floor((level - 1) / 5);
               return {
                 id: member.user_id,
-                farmId: myFarmId.value,
+                farmId: targetFarmId,
                 role: member.role,
                 name: name,
                 level: level,
