@@ -2748,6 +2748,15 @@
         };
 
         const rejectFriendRequest = async (requestId) => {
+          const targetReq = pendingRequests.value.find(r => r.id === requestId);
+          const targetUserId = targetReq ? targetReq.sender_id : null;
+
+          pendingRequests.value = pendingRequests.value.filter(r => r.id !== requestId);
+
+          if (targetUserId) {
+            requestedFriends.value = requestedFriends.value.filter(id => id !== targetUserId);
+          }
+
           try {
             const { error } = await supa
               .from('friendships')
@@ -2755,13 +2764,15 @@
               .eq('id', requestId);
               
             if (error) {
-              alert('拒否エラー: ' + error.message);
+              console.error('拒否エラー:', error.message);
+              alert('データベース上の申請レコード削除に失敗しました。');
+              await loadPendingRequests();
             } else {
               await loadPendingRequests();
               await loadFriendsList();
             }
           } catch (e) {
-            console.error('拒否処理例外:', e);
+            console.error('拒否時の予期せぬ例外:', e);
           }
         };
 
