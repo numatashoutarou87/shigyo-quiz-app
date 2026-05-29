@@ -2635,7 +2635,7 @@
           try {
             const { data, error } = await supa
               .from('friendships')
-              .select('*')
+              .select('*, sender_profile:user_profiles!friendships_sender_id_fkey(*)')
               .eq('receiver_id', myId)
               .eq('status', 'pending');
               
@@ -2644,21 +2644,15 @@
               return;
             }
             if (data && data.length > 0) {
-              const senderIds = data.map(req => req.sender_id);
-              const { data: profiles, error: pError } = await supa
-                .from('user_profiles')
-                .select('*')
-                .in('id', senderIds);
-                
-              if (!pError && profiles) {
-                pendingRequests.value = data.map(req => {
-                  const p = profiles.find(profile => profile.id === req.sender_id);
-                  return { ...req, sender_profile: p || { user_name: '不明なユーザー' } };
-                });
-                return;
-              }
+              pendingRequests.value = data.map(req => {
+                // Supabaseからの結合結果が配列になる場合と単体オブジェクトになる場合を吸収
+                let profile = req.sender_profile;
+                if (Array.isArray(profile)) profile = profile[0];
+                return { ...req, sender_profile: profile || { user_name: '不明なユーザー' } };
+              });
+            } else {
+              pendingRequests.value = [];
             }
-            pendingRequests.value = [];
           } catch (e) {
             console.error('申請一覧ロード例外:', e);
           }
