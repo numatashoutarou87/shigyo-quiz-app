@@ -515,6 +515,7 @@
           {{ isAlreadyFriend(activeFirmMember?.id) ? 'フレンド登録済み' : (requestedFriends.includes(activeFirmMember?.id) ? '申請中' : 'フレンド申請する') }}
         </button>
         <button v-if="isFirmOwner && activeFirmMember?.farmId === myFarmId" class="primary-btn" @click="transferOwnership(activeFirmMember)" style="background:#d35400; color:white; margin-top:10px;">👑 設立者権限を移譲する</button>
+        <button v-if="isFirmOwner && activeFirmMember?.farmId === myFarmId && activeFirmMember?.id !== currentUser" class="primary-btn" @click="kickFirmMember(activeFirmMember)" style="background:#C62828; color:white; margin-top:10px;">❌ ファームから脱退させる</button>
         <button class="badge-modal-close" @click="showMemberProfileModal = false; activeFirmMember = null" style="background:var(--text-sub); margin-top:10px;">閉じる</button>
       </div>
     </div>
@@ -1018,8 +1019,8 @@
                 <h2 style="font-size: 16px;">{{ myFarmName || 'マイファーム' }}</h2>
                 <div style="display: flex; gap: 8px;">
                   <button @click="debugDeleteAllFarms" style="background:#000; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">⚠️ デバッグ：全ファーム削除</button>
-                  <button @click="leaveFirm" style="background:#C62828; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">🚪 脱退</button>
-                  <button class="member-list-btn" @click="openFarmMembers" style="background:var(--accent-gold); color:var(--primary-navy); border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">👥 メンバー</button>
+                  <button v-if="!isFirmOwner" @click="leaveFirm" style="background:#C62828; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">🚪 脱退</button>
+                  <button v-if="isFirmOwner" @click="dissolveFarm" style="background:#B71C1C; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">💥 解散</button>
                 </div>
               </header>
               <div class="firm-chat-section" style="flex:1; display:flex; flex-direction:column;">
@@ -3305,6 +3306,28 @@
           }
         };
 
+        const dissolveFarm = async () => {
+          if (confirm('【警告】本当にファームを解散しますか？\n全てのチャット履歴とメンバー情報が完全に消去され、元に戻せません。')) {
+            try {
+              const targetFarmId = myFarmId.value;
+              const { error } = await supa.from('farms').delete().eq('id', targetFarmId);
+              
+              if (error) throw error;
+              
+              alert('ファームを解散しました。');
+              isFarmMember.value = false;
+              isFirmOwner.value = false;
+              firmJoinRoute.value = 'lobby';
+              firmChat.value = [];
+              myFarmId.value = '';
+              myFarmName.value = '';
+            } catch (e) {
+              console.error('ファーム解散エラー:', e);
+              alert('解散処理に失敗しました: ' + e.message);
+            }
+          }
+        };
+
         const firmJoinRoute = ref('lobby');
         const firmSearchQuery = ref('');
         const newFirmName = ref('');
@@ -3424,7 +3447,9 @@
                 .eq('farm_id', myFarmId.value);
               if (!error) {
                 firmMembers.value = firmMembers.value.filter(member => member.id !== m.id);
-                alert(`${m.name} さんをキックしました。`);
+                showMemberProfileModal.value = false;
+                activeFirmMember.value = null;
+                alert(`${m.name} さんを強制脱退させました。`);
               } else {
                 alert('キック処理に失敗しました。');
               }
@@ -3724,7 +3749,7 @@
           examCountdownString, isExamLive, startMockExam,
           examQueue, examCurrentIndex, examCurrentQuestion, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
-          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership, openFarmMembers,
+          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, kickFirmMember, transferOwnership, openFarmMembers, dissolveFarm, dissolveFarm,
           firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm, myFarmName, debugDeleteAllFarms,
           friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge
