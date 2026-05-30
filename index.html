@@ -730,11 +730,7 @@
                   <div style="font-size: 16px; margin-bottom: 10px;">正答数: <span style="font-size:32px; color:var(--accent-gold); font-weight:bold;">{{ examCorrectCount }}</span> / 100</div>
                   <div style="color: var(--success-color); font-weight: bold; margin-bottom: 20px;">+{{ isPremium ? examCorrectCount * 30 : examCorrectCount * 10 }} EXP獲得！</div>
                   
-                  <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; text-align: left;">
-                    <p>🏆 <strong>全国順位 (推定):</strong> {{ Math.floor(Math.random() * 500) + 1 }}位 / 4,200人</p>
-                    <p v-if="isFarmMember">🏢 <strong>ファーム平均点:</strong> {{ Math.floor(Math.random() * 20) + 60 }}点</p>
-                  </div>
-                  
+
                   <button v-if="isFarmMember" class="primary-btn" @click="triggerInterstitial(returnToFirmFromExam)">ファーム会議室へ進む</button>
                   <button v-else class="primary-btn" @click="triggerInterstitial(() => { activeTab = 'home' })">ホームへ戻る</button>
                 </div>
