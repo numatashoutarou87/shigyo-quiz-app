@@ -612,7 +612,7 @@
               <span class="toggle-label" style="margin-right:8px;">{{ isFirmOwner ? 'オーナー: 有' : 'オーナー: 無' }}</span>
             </label>
             <button class="dev-btn" @click="myFarmId = myFarmId === 'other_farm' ? 'f_123' : 'other_farm'" style="background: #8E44AD;">自分を別ファームの所属にする</button>
-            <button class="dev-btn" @click="startMockExam(10)" style="background: #C62828;">🔥強制模試(10秒)</button>
+            <button class="dev-btn" @click="forceStartRealMockExam()" style="background: #C62828;">🔥強制模試(100問)</button>
             <button class="dev-btn" @click="addExp(1000000)">EXP+100万</button>
             <button class="dev-btn" @click="unlockedBadges = ALL_BADGES.map(b=>b.id)" style="background: #E65100;">全バッジ解放</button>
             <button class="dev-btn" @click="addDummyFriendsMode(5)" style="background: #0F9D58;">ダミーフレンド+5</button>
@@ -635,7 +635,7 @@
             <div class="exam-banner" :class="{live: isExamLive}" v-if="!isExamLive">
               📢 21時 一斉模試まで あと {{ examCountdownString }}
             </div>
-            <div class="exam-banner live" v-else @click="startMockExam(3600)" style="cursor:pointer;">
+            <div class="exam-banner live" v-else @click="forceStartRealMockExam()" style="cursor:pointer;">
               📢 【現在開催中！】一斉模試に参加する (タップ)
             </div>
 
@@ -2255,11 +2255,9 @@
         const isExamLoading = ref(false);
 
         /**
-         * 模試用の100問を科目順に厳密なランダムで抽出し、結合する関数
+         * 7科目・計100問をSupabaseから完全に取得し終えるまで次に進ませない独立関数
          */
-        const fetchMockQuestions = async () => {
-          // 中小企業診断士1次試験の科目別・抽出数定義（計100問）
-          // ※既存のクエリ定義に合わせたDB上のsubject名でマッピング
+        const fetchStrict7Subjects100Questions = async () => {
           const subjectCounts = [
             { db: '経済学', count: 14 },
             { db: '財務会計', count: 14 },
@@ -2270,10 +2268,9 @@
             { db: '中小政策', count: 14 }
           ];
 
-          let mockQuestionsArray = [];
+          let realQuestionsArray = [];
 
           for (const sc of subjectCounts) {
-            // 各科目の問題をSupabaseから全件取得（順番指定なし）
             const { data, error } = await supa
               .from('questions')
               .select('*')
@@ -2281,55 +2278,56 @@
               
             if (error) {
               console.error(`[MockExam] ${sc.db} の抽出中にエラーが発生しました:`, error);
-              continue; // 該当科目でエラーが起きても他の科目の抽出は継続
+              continue; 
             }
             
             if (data && data.length > 0) {
-              // 偏りをなくし完全なランダム性を保証する Fisher-Yates シャッフルアルゴリズム
+              // 偏りをなくし完全なランダム性を保証する Fisher-Yates シャッフル
               for (let i = data.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [data[i], data[j]] = [data[j], data[i]];
               }
 
-              // シャッフルされた配列の先頭から規定数(count)だけ抽出し、既存の normalizeQuestion を適用
+              // シャッフルされた配列の先頭から規定数だけ抽出し、結合
               const selectedQuestions = data.slice(0, sc.count).map(normalizeQuestion);
-              
-              // 抽出した問題を最終配列へ順番通りに結合
-              mockQuestionsArray = mockQuestionsArray.concat(selectedQuestions);
+              realQuestionsArray = realQuestionsArray.concat(selectedQuestions);
             }
           }
 
-          // 綺麗に1番〜100番まで科目順に結合されたオブジェクト配列を返す
-          return mockQuestionsArray;
+          return realQuestionsArray;
         };
 
-        const startMockExam = async () => {
-          const durationSeconds = 3600; // 本番仕様の3600秒（60分）固定
-
+        /**
+         * 完全に独立して動く、100%本物しか出さない新しい開始関数
+         */
+        const forceStartRealMockExam = async () => {
+          console.log("本物の100問模試を開始します。ダミーを排除中...");
+          
           if (isExamLoading.value) return;
           isExamLoading.value = true;
           
           try {
-            // 上記で作成した完璧な抽出関数を呼び出し、100問の配列を受け取る
-            let finalExamQuestions = await fetchMockQuestions();
-
-            // 問題データが0件（通信エラー等）の場合はダミーを出さず、エラー表示して中断
-            if (finalExamQuestions.length !== 100) {
-              console.error("100問の抽出に失敗しました。取得件数:", finalExamQuestions.length);
-              alert("問題データの取得に失敗しました。通信環境を確認し、もう一度お試しください。");
+            // ─── ステップ1: 7科目・計100問をSupabaseから完全に取得し終えるまで次に進ませない ───
+            const real100Questions = await fetchStrict7Subjects100Questions();
+            
+            if (!real100Questions || real100Questions.length !== 100) {
+              alert("データの取得に失敗したか、100問揃いませんでした。件数: " + (real100Questions?.length || 0));
               isExamLoading.value = false;
               return;
             }
 
-            // 取得した100問の配列を模試のキューにセット
-            examQueue.value = finalExamQuestions;
-            examCurrentIndex.value = 0;
+            // ─── ステップ2: アプリが保持しているグローバルな問題配列を100%本物で上書き ───
+            examQueue.value = real100Questions; 
+            examCurrentIndex.value = 0; // 1問目（インデックス0）にリセット
             examCorrectCount.value = 0;
             isExamFinished.value = false;
-            
-            // 制限時間セット（本番仕様の3600秒）
+
+            // ─── ステップ3: 100問が確定した状態で、初めて本番のタイマーとUIを起動する ───
+            const durationSeconds = 3600; // 60分
             examTotalTime.value = durationSeconds;
             examTimeLeft.value = durationSeconds;
+            
+            // 模試画面を表示（既存のUI描画トリガー）
             activeTab.value = 'exam';
             
             if(examTimerInterval) clearInterval(examTimerInterval);
@@ -2342,8 +2340,8 @@
             }, 1000);
             
           } catch(e) {
-            console.error("模試生成エラー:", e);
-            alert("模試の読み込み中にエラーが発生しました。");
+            console.error("模試強制開始エラー:", e);
+            alert("模試の読み込み中に予期せぬエラーが発生しました。");
           } finally {
             isExamLoading.value = false;
           }
@@ -3948,7 +3946,7 @@
           showBenefitScreen, showGPlayModal, isProcessingPayment, doGooglePlayPurchase, cancelSubscription,
           showInterstitialAd, adCountdown, triggerInterstitial, closeInterstitialAd,
 
-          examCountdownString, isExamLive, startMockExam,
+          examCountdownString, isExamLive, forceStartRealMockExam,
           examQueue, examCurrentIndex, examCurrentQuestion, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
           firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, openFarmMembers,
