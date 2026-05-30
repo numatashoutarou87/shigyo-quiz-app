@@ -612,7 +612,7 @@
               <span class="toggle-label" style="margin-right:8px;">{{ isFirmOwner ? 'オーナー: 有' : 'オーナー: 無' }}</span>
             </label>
             <button class="dev-btn" @click="myFarmId = myFarmId === 'other_farm' ? 'f_123' : 'other_farm'" style="background: #8E44AD;">自分を別ファームの所属にする</button>
-            <button class="dev-btn" @click="forceStartRealMockExam()" style="background: #C62828;">🔥強制模試(100問)</button>
+            <button class="dev-btn" @click="forceStartRealMockExam(true)" style="background: #C62828;">🔥強制模試(100問)</button>
             <button class="dev-btn" @click="addExp(1000000)">EXP+100万</button>
             <button class="dev-btn" @click="unlockedBadges = ALL_BADGES.map(b=>b.id)" style="background: #E65100;">全バッジ解放</button>
             <button class="dev-btn" @click="addDummyFriendsMode(5)" style="background: #0F9D58;">ダミーフレンド+5</button>
@@ -635,7 +635,7 @@
             <div class="exam-banner" :class="{live: isExamLive}" v-if="!isExamLive">
               📢 21時 一斉模試まで あと {{ examCountdownString }}
             </div>
-            <div class="exam-banner live" v-else @click="forceStartRealMockExam()" style="cursor:pointer;">
+            <div class="exam-banner live" v-else @click="forceStartRealMockExam(false)" style="cursor:pointer;">
               📢 【現在開催中！】一斉模試に参加する (タップ)
             </div>
 
@@ -716,6 +716,10 @@
                       </div>
                       <div class="question-content">
                         <p class="q-statement">{{ examCurrentQuestion.statement }}</p>
+                        <!-- デバッグモード用の正解表示（デバッグ起動時のみ表示） -->
+                        <div v-if="isMockDebugMode" id="mock-debug-answer" style="text-align: center; font-weight: bold; color: #ef4444; margin-top: 10px;">
+                          【デバッグ】正解: {{ examCurrentQuestion.is_correct ? '〇' : '×' }}
+                        </div>
                       </div>
                     </div>
                 </div>
@@ -1424,7 +1428,7 @@
 
           { id: 'badge_exam_01', name: '初陣の証明', icon: '🎟️', conditionText: '21時一斉模試に初めて参加し、最後まで解ききる', flavorText: '本番さながらの緊張感。ナイスファイト！', category: 'exam' },
           { id: 'badge_exam_02', name: '皆勤賞', icon: '📅', conditionText: '一斉模試への累計参加日数が30回を突破する', flavorText: '雨の日も風の日も、21時に戦い続けた努力の天才。', category: 'exam' },
-          { id: 'badge_exam_03', name: '精密機械', icon: '🤖', conditionText: '一斉模試で、ケアレスミスなく100点満点を獲得する', flavorText: '誤答確率0%。あなたの知識に死角はありません。', category: 'exam' },
+          { id: 'badge_exam_03', name: '精密機械', icon: '🤖', conditionText: '一斉模試で全問正解する', flavorText: '誤答確率0%。あなたの知識に死角はありません。', category: 'exam' },
 
           { id: 'badge_farm_01', name: '開拓者（パイオニア）', icon: '🚩', conditionText: '自分で新しいファームを立ち上げ、創設者になる', flavorText: '新たな旗を掲げた！あなたのリーダーシップに期待。', category: 'farm' },
           { id: 'badge_farm_02', name: '新緑の芽吹き', icon: '🌱', conditionText: '既存のファームに初めて加入する', flavorText: 'ファームの一員に！チームのために汗をかおう。', category: 'farm' }
@@ -2309,11 +2313,14 @@
           return realQuestionsArray;
         };
 
+        const isMockDebugMode = ref(false);
+
         /**
          * 完全に独立して動く、100%本物しか出さない新しい開始関数
          */
-        const forceStartRealMockExam = async () => {
+        const forceStartRealMockExam = async (isDebug = false) => {
           console.log("本物の100問模試を開始します。ダミーを排除中...");
+          isMockDebugMode.value = isDebug; // フラグをセット
           
           if (isExamLoading.value) return;
           isExamLoading.value = true;
@@ -2381,12 +2388,21 @@
 
         const endExam = () => {
           isExamFinished.value = true;
+          isMockDebugMode.value = false; // デバッグモードを安全にリセット
           addExp(examCorrectCount.value * 10);
           
           examParticipatedCount.value++;
           checkAndUnlockBadge('badge_exam_01');
           if (examParticipatedCount.value >= 30) checkAndUnlockBadge('badge_exam_02');
-          if (examCorrectCount.value === 100) checkAndUnlockBadge('badge_exam_03');
+          if (examCorrectCount.value === 100) {
+            if (!unlockedBadges.value.includes('badge_exam_03')) {
+              checkAndUnlockBadge('badge_exam_03');
+              alert("🎉 おめでとうございます！一斉模試全問正解バッジを獲得しました！");
+            } else {
+              // すでにバッジを持っている場合でもお祝いする
+              alert("🎉 おめでとうございます！一斉模試全問正解です！");
+            }
+          }
           if (examCorrectCount.value >= 90) checkAndUnlockBadge('10分間の支配者'); // 既存バッジ互換
           
           if (examTimerInterval) clearInterval(examTimerInterval);
@@ -3958,7 +3974,7 @@
           showBenefitScreen, showGPlayModal, isProcessingPayment, doGooglePlayPurchase, cancelSubscription,
           showInterstitialAd, adCountdown, triggerInterstitial, closeInterstitialAd,
 
-          examCountdownString, isExamLive, forceStartRealMockExam,
+          examCountdownString, isExamLive, forceStartRealMockExam, isMockDebugMode,
           examQueue, examCurrentIndex, examCurrentQuestion, currentExamSubjectName, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
           firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, openFarmMembers,
