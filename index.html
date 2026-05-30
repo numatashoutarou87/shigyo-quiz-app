@@ -1360,6 +1360,7 @@
           globalPresenceChannel = supa.channel('global_lobby_presence', {
             config: { presence: { key: currentUser.value } }
           });
+          
           globalPresenceChannel.on('presence', { event: 'sync' }, () => {
             const state = globalPresenceChannel.presenceState();
             const counts = {};
@@ -1373,12 +1374,49 @@
             STUDY_ROOMS.value.forEach(r => {
               r.count = counts[r.id] || 0;
             });
-          }).subscribe();
+          });
+
+          // 他のユーザーの本物の入室を検知
+          globalPresenceChannel.on('presence', { event: 'join' }, ({ key, newPresences }) => {
+            if (key === currentUser.value) return; // 自分の入室は無視
+            newPresences.forEach(p => {
+              if (activeRoom.value?.type === 'silent' && p.room_id === activeRoom.value.id) {
+                studyLogs.value.push({
+                  time: getFormattedTime(),
+                  user: { name: p.user_name || '別のユーザー' },
+                  action: 'が入室しました',
+                  type: 'silent'
+                });
+                if(studyLogs.value.length > 30) studyLogs.value.shift();
+                setTimeout(() => { const el = document.getElementById('studyLogs'); if(el) el.scrollTop = el.scrollHeight; }, 100);
+              }
+            });
+          });
+          
+          // 他のユーザーの本物の退室を検知
+          globalPresenceChannel.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+            if (key === currentUser.value) return; // 自分の退室は無視
+            leftPresences.forEach(p => {
+              if (activeRoom.value?.type === 'silent' && p.room_id === activeRoom.value.id) {
+                studyLogs.value.push({
+                  time: getFormattedTime(),
+                  user: { name: p.user_name || '別のユーザー' },
+                  action: 'が退室しました',
+                  type: 'silent'
+                });
+                if(studyLogs.value.length > 30) studyLogs.value.shift();
+                setTimeout(() => { const el = document.getElementById('studyLogs'); if(el) el.scrollTop = el.scrollHeight; }, 100);
+              }
+            });
+          });
+
+          globalPresenceChannel.subscribe();
         };
 
         const updateMyRoomPresence = (roomId) => {
           if (globalPresenceChannel && currentUser.value) {
-            globalPresenceChannel.track({ room_id: roomId });
+            // 表示名をtrackに含めることで、他のユーザーが入退室時にリアルな名前を取得できるようにする
+            globalPresenceChannel.track({ room_id: roomId, user_name: displayName.value || '匿名ユーザー' });
           }
         };
         const lobbyActiveTab = ref('silent');
@@ -2502,7 +2540,6 @@
           studyLogs.value.push({ time: getFormattedTime(), text: `<strong style="color:#0F9D58;">システム:</strong> 「${rn}」に入室しました。` });
           
           if(timelineInterval) clearInterval(timelineInterval);
-          timelineInterval = setInterval(generateRandomStudyLog, Math.random() * 3000 + 3000);
         };
 
         window.closeCelebration = () => {
@@ -2985,29 +3022,7 @@
         const studyLogs = ref([]);
 
 
-        const DUMMY_STUDY_USERS = [
-          { id: 'su_1', farmId: 'other_farm', name: 'アソシエイトA', level: 12, title: 'アソシエイト', badge: '🔰 新人', intro: 'よろしくお願いします！' },
-          { id: 'su_2', farmId: 'other_farm', name: '財務の鬼', level: 25, title: 'シニア・アソシエイト', badge: '🔥 熱血', intro: '財務特化型です。' },
-          { id: 'su_3', farmId: 'other_farm', name: 'Bさん', level: 5, title: 'アソシエイト', badge: '📚 勉強鬼', intro: '毎日コツコツ。' },
-          { id: 'su_4', farmId: 'other_farm', name: '合格祈願', level: 42, title: 'マネージャー', badge: '🏆 ランカー', intro: '今年で絶対受かる。' },
-          { id: 'su_5', farmId: 'other_farm', name: '診断士2026', level: 18, title: 'アソシエイト', badge: '🔰 新人', intro: '過去問回してます。' },
-          { id: 'su_6', farmId: 'other_farm', name: 'Yさん', level: 30, title: 'シニア・アソシエイト', badge: '🔥 熱血', intro: '一緒に頑張りましょう。' }
-        ];
-        const studyActions = ['が正解しました！', 'が3連続正解🔥', 'が入室しました', 'が苦戦中...'];
-        const chatMessages = ['財務の事例Ⅳが難しい…', '今日の21時模試がんばりましょう！', '経済学のグラフが覚えられないです', 'お疲れ様です！', 'みなさん進捗どうですか？', '情報システムは過去問回せばいけます！'];
-
-        const generateRandomStudyLog = () => {
-          if (authScreen.value !== 'app' || studyRoute.value !== 'quiz') return;
-          const u = DUMMY_STUDY_USERS[Math.floor(Math.random() * DUMMY_STUDY_USERS.length)];
-          
-          if (activeRoom.value?.type === 'silent') {
-            const action = studyActions[Math.floor(Math.random() * studyActions.length)];
-            studyLogs.value.push({ time: getFormattedTime(), user: u, action: action, type: 'silent' });
-            if(studyLogs.value.length > 30) studyLogs.value.shift();
-            const el = document.getElementById('studyLogs');
-            if(el) setTimeout(() => el.scrollTop = el.scrollHeight, 100);
-          }
-        };
+        // ダミーユーザーや賑やかしメッセージの生成ロジックは完全に削除されました。
 
         const createFirm = async () => {
           const fn = newFirmName.value.trim();
