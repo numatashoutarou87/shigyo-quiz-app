@@ -635,7 +635,7 @@
             <div class="exam-banner" :class="{live: isExamLive}" v-if="!isExamLive">
               📢 21時 一斉模試まで あと {{ examCountdownString }}
             </div>
-            <div class="exam-banner live" v-else @click="startMockExam(600)" style="cursor:pointer;">
+            <div class="exam-banner live" v-else @click="startMockExam(3600)" style="cursor:pointer;">
               📢 【現在開催中！】一斉模試に参加する (タップ)
             </div>
 
@@ -2256,36 +2256,101 @@
           return `${m}:${s.toString().padStart(2, '0')}`;
         });
 
-        const startMockExam = (durationSeconds = 600) => {
-          if (rawQuestions.value.length === 0) rawQuestions.value = fallbackQuestions.map(normalizeQuestion);
+        const isExamLoading = ref(false);
 
-          let pool = [...rawQuestions.value];
-          let hundred = [];
-          while(hundred.length < 100) {
-            pool.sort(() => 0.5 - Math.random());
-            for(let q of pool) {
-              if(hundred.length < 100) hundred.push(q);
-              else break;
+        /**
+         * 模試用の100問を科目順に厳密なランダムで抽出し、結合する関数
+         */
+        const fetchMockQuestions = async () => {
+          // 中小企業診断士1次試験の科目別・抽出数定義（計100問）
+          // ※既存のクエリ定義に合わせたDB上のsubject名でマッピング
+          const subjectCounts = [
+            { db: '経済学', count: 14 },
+            { db: '財務会計', count: 14 },
+            { db: '企業経営', count: 15 },
+            { db: '運営管理', count: 15 },
+            { db: '経営法務', count: 14 },
+            { db: '情報システム', count: 14 },
+            { db: '中小政策', count: 14 }
+          ];
+
+          let mockQuestionsArray = [];
+
+          for (const sc of subjectCounts) {
+            // 各科目の問題をSupabaseから全件取得（順番指定なし）
+            const { data, error } = await supa
+              .from('questions')
+              .select('*')
+              .eq('subject', sc.db);
+              
+            if (error) {
+              console.error(`[MockExam] ${sc.db} の抽出中にエラーが発生しました:`, error);
+              continue; // 該当科目でエラーが起きても他の科目の抽出は継続
+            }
+            
+            if (data && data.length > 0) {
+              // 偏りをなくし完全なランダム性を保証する Fisher-Yates シャッフルアルゴリズム
+              for (let i = data.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [data[i], data[j]] = [data[j], data[i]];
+              }
+
+              // シャッフルされた配列の先頭から規定数(count)だけ抽出し、既存の normalizeQuestion を適用
+              const selectedQuestions = data.slice(0, sc.count).map(normalizeQuestion);
+              
+              // 抽出した問題を最終配列へ順番通りに結合
+              mockQuestionsArray = mockQuestionsArray.concat(selectedQuestions);
             }
           }
+
+          // 綺麗に1番〜100番まで科目順に結合されたオブジェクト配列を返す
+          return mockQuestionsArray;
+        };
+
+        const startMockExam = async () => {
+          const durationSeconds = 3600; // 本番仕様の3600秒（60分）固定
+
+          if (isExamLoading.value) return;
+          isExamLoading.value = true;
           
-          examQueue.value = hundred;
-          examCurrentIndex.value = 0;
-          examCorrectCount.value = 0;
-          isExamFinished.value = false;
-          
-          examTotalTime.value = durationSeconds;
-          examTimeLeft.value = durationSeconds;
-          activeTab.value = 'exam';
-          
-          if(examTimerInterval) clearInterval(examTimerInterval);
-          examTimerInterval = setInterval(() => {
-            examTimeLeft.value--;
-            if (examTimeLeft.value <= 0) {
-              clearInterval(examTimerInterval);
-              endExam();
+          try {
+            // 上記で作成した完璧な抽出関数を呼び出し、100問の配列を受け取る
+            let finalExamQuestions = await fetchMockQuestions();
+
+            // 万が一ネットワーク切断等でDB通信に失敗した場合のフォールバック
+            if (finalExamQuestions.length === 0) {
+              if (rawQuestions.value.length === 0) {
+                rawQuestions.value = fallbackQuestions.map(normalizeQuestion);
+              }
+              finalExamQuestions = rawQuestions.value.slice(0, 100);
             }
-          }, 1000);
+
+            // 取得した100問の配列を模試のキューにセット
+            examQueue.value = finalExamQuestions;
+            examCurrentIndex.value = 0;
+            examCorrectCount.value = 0;
+            isExamFinished.value = false;
+            
+            // 制限時間セット（本番仕様の3600秒）
+            examTotalTime.value = durationSeconds;
+            examTimeLeft.value = durationSeconds;
+            activeTab.value = 'exam';
+            
+            if(examTimerInterval) clearInterval(examTimerInterval);
+            examTimerInterval = setInterval(() => {
+              examTimeLeft.value--;
+              if (examTimeLeft.value <= 0) {
+                clearInterval(examTimerInterval);
+                endExam();
+              }
+            }, 1000);
+            
+          } catch(e) {
+            console.error("模試生成エラー:", e);
+            alert("模試の読み込み中にエラーが発生しました。");
+          } finally {
+            isExamLoading.value = false;
+          }
         };
 
         const handleExamAnswer = (userAnswer) => {
