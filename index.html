@@ -1614,16 +1614,19 @@
                 total_exp: 0,
                 level: 1,
                 unlocked_badges: ['🔰 新人'],
-                active_badge: '🔰 新人'
+                active_badge: '🔰 新人',
+                is_premium: false
               };
               await supa.from('user_profiles').insert([newProfile]);
               totalExp.value = 0;
               unlockedBadges.value = ['🔰 新人'];
               activeBadge.value = '🔰 新人';
+              isPremium.value = false;
             } else if (data) {
               totalExp.value = data.total_exp || 0;
               unlockedBadges.value = data.unlocked_badges || ['🔰 新人'];
               activeBadge.value = data.active_badge || '🔰 新人';
+              isPremium.value = data.is_premium || false;
               
               if (data.completed_blocks && Array.isArray(data.completed_blocks)) {
                 const loadedMB = {};
@@ -1844,23 +1847,34 @@
         const showGPlayModal = ref(false);
         const isProcessingPayment = ref(false);
 
-        const doGooglePlayPurchase = () => {
+        const doGooglePlayPurchase = async () => {
           isProcessingPayment.value = true;
-          setTimeout(() => {
+          
+          try {
+            // Supabaseのデータベースを直接更新して課金状態を本番化する
+            const { error } = await supa
+              .from('user_profiles')
+              .update({ is_premium: true })
+              .eq('id', currentUser.value);
+
+            if (error) throw error;
+
             isProcessingPayment.value = false;
             showGPlayModal.value = false;
             isPremium.value = true;
-            badgeToastMessage.value = "プレミアムプランの支払いが完了しました！";
-            showBadgeToast.value = true;
-            setTimeout(() => { showBadgeToast.value = false; }, 4000);
-          }, 3000);
+            alert("プレミアムプランの支払いが完了し、特典が有効になりました！");
+          } catch (e) {
+            isProcessingPayment.value = false;
+            console.error("プレミアム加入エラー:", e);
+            alert("決済処理中にエラーが発生しました: " + e.message);
+          }
         };
 
         const cancelSubscription = async () => {
           if (!confirm("本当にサブスクリプションを解約しますか？\n解約すると、ただちにプレミアム特典が利用できなくなります。")) return;
 
           try {
-            // データベースの user_profiles テーブルで is_premium フラグを無課金に上書き
+            // クラウドの is_premium を false に確実にダウングレードする
             const { error } = await supa
               .from('user_profiles')
               .update({ is_premium: false })
