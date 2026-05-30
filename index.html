@@ -1228,11 +1228,7 @@
 
     const { createApp, ref, computed, watch, onMounted } = Vue;
 
-    const fallbackQuestions = [
-      { "id": 1, "topic": "国民経済計算", "year": 2025, "question_no": 1, "statement": "【ダミー】GDPはフローの概念である。", "is_correct": true, "explanation": "GDPは一定期間の流れ（フロー）です。" },
-      { "id": 2, "topic": "景気動向", "year": 2024, "question_no": 2, "statement": "【ダミー】有効求人倍率は先行系列である。", "is_correct": false, "explanation": "有効求人倍率は一致系列です。" },
-      { "id": 3, "topic": "金融政策", "year": 2023, "question_no": 3, "statement": "【ダミー】日銀が買いオペを行うとマネーストックは増加する。", "is_correct": true, "explanation": "資金が市場に供給されるため増加します。" }
-    ];
+
 
     const TITLES = [
       "アソシエイト（見習い）", "ジュニア・コンサルタント", "専任コンサルタント", "シニア・コンサルタント", "主任チーフ・アナリスト",
@@ -2317,12 +2313,12 @@
             // 上記で作成した完璧な抽出関数を呼び出し、100問の配列を受け取る
             let finalExamQuestions = await fetchMockQuestions();
 
-            // 万が一ネットワーク切断等でDB通信に失敗した場合のフォールバック
-            if (finalExamQuestions.length === 0) {
-              if (rawQuestions.value.length === 0) {
-                rawQuestions.value = fallbackQuestions.map(normalizeQuestion);
-              }
-              finalExamQuestions = rawQuestions.value.slice(0, 100);
+            // 問題データが0件（通信エラー等）の場合はダミーを出さず、エラー表示して中断
+            if (finalExamQuestions.length !== 100) {
+              console.error("100問の抽出に失敗しました。取得件数:", finalExamQuestions.length);
+              alert("問題データの取得に失敗しました。通信環境を確認し、もう一度お試しください。");
+              isExamLoading.value = false;
+              return;
             }
 
             // 取得した100問の配列を模試のキューにセット
