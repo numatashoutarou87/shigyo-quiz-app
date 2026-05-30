@@ -2272,7 +2272,7 @@
 
           for (const sc of subjectCounts) {
             const { data, error } = await supa
-              .from('questions')
+              .from('quizzes')
               .select('*')
               .eq('subject', sc.db);
               
