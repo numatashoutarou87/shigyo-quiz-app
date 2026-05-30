@@ -1615,18 +1615,21 @@
                 level: 1,
                 unlocked_badges: ['🔰 新人'],
                 active_badge: '🔰 新人',
-                is_premium: false
+                is_premium: false,
+                intro: ''
               };
               await supa.from('user_profiles').insert([newProfile]);
               totalExp.value = 0;
               unlockedBadges.value = ['🔰 新人'];
               activeBadge.value = '🔰 新人';
               isPremium.value = false;
+              selfIntro.value = '';
             } else if (data) {
               totalExp.value = data.total_exp || 0;
               unlockedBadges.value = data.unlocked_badges || ['🔰 新人'];
               activeBadge.value = data.active_badge || '🔰 新人';
               isPremium.value = data.is_premium || false;
+              selfIntro.value = data.intro || '';
               
               if (data.completed_blocks && Array.isArray(data.completed_blocks)) {
                 const loadedMB = {};
@@ -3593,7 +3596,35 @@
           }
         };
         
-        const saveSelfIntro = () => { alert('自己紹介を保存しました（自動セーブ完了）'); };
+        const saveSelfIntro = async () => {
+          const text = selfIntro.value.trim();
+          if (text.length > 200) {
+            alert("自己紹介は200文字以内で入力してください。");
+            return;
+          }
+
+          try {
+            // データベースの user_profiles テーブルの intro カラムを確実に更新
+            const { error } = await supa
+              .from('user_profiles')
+              .update({ intro: text })
+              .eq('id', currentUser.value);
+
+            if (error) {
+              console.error("自己紹介の保存エラー:", error);
+              alert("自己紹介の保存に失敗しました: " + error.message);
+              return;
+            }
+
+            // 更新が成功したらローカルのUI変数にも反映して保存
+            selfIntro.value = text;
+            alert("自己紹介を更新しました！");
+            saveUserProfile(); // 既存のローカル保存処理等も一応実行しておく
+          } catch (e) {
+            console.error("自己紹介の保存で予期せぬエラー:", e);
+            alert("自己紹介の保存中にエラーが発生しました。");
+          }
+        };
 
         const addDummyFriend = () => {
           if (!isPremium.value && friendCount.value >= 15) {
