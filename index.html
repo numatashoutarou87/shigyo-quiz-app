@@ -3498,7 +3498,7 @@
 
 
 
-        const editDisplayName = () => {
+        const editDisplayName = async () => {
           const newName = prompt('新しいユーザー名を入力してください (最大12文字)', displayName.value);
           if (newName !== null) {
             const trimmed = newName.trim();
@@ -3510,8 +3510,26 @@
               alert('ユーザー名は12文字以内で入力してください。');
               return;
             }
-            displayName.value = trimmed;
-            alert('ユーザー名を変更しました。');
+
+            try {
+              // データベースの user_profiles テーブルを確実に更新
+              const { error } = await supa
+                .from('user_profiles')
+                .update({ user_name: trimmed })
+                .eq('id', currentUser.value);
+
+              if (error) {
+                alert('名前変更エラー: ' + error.message);
+                return;
+              }
+
+              // 更新が成功したら、画面上のUIも新しい名前に即時反映
+              displayName.value = trimmed;
+              alert('ユーザー名を変更しました！');
+            } catch (e) {
+              console.error('名前変更で予期せぬエラー:', e);
+              alert('名前変更中にエラーが発生しました。');
+            }
           }
         };
         
