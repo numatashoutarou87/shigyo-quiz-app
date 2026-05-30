@@ -1094,8 +1094,8 @@
                   <div style="margin-bottom: 20px; padding: 16px; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center; border: 2px solid var(--accent-gold);">
                     <div v-if="isPremium" style="font-size: 16px; font-weight: bold; color: var(--accent-gold);">
                       👑 プレミアム会員
-                      <div style="margin-top: 10px;">
-                        <button @click="downgradeToFreePlan" style="font-size: 12px; background: #6b7280; color: white; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">通常プラン（無課金）に戻す</button>
+                      <div style="margin-top: 15px;">
+                        <button @click="cancelSubscription" style="font-size: 12px; background: transparent; color: #9ca3af; border: 1px solid #d1d5db; padding: 6px 12px; border-radius: 4px; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.color='#ef4444'; this.style.borderColor='#ef4444';" onmouseout="this.style.color='#9ca3af'; this.style.borderColor='#d1d5db';">サブスクリプションを解約する</button>
                       </div>
                     </div>
                     <div v-else>
@@ -1856,8 +1856,8 @@
           }, 3000);
         };
 
-        const downgradeToFreePlan = async () => {
-          if (!confirm("本当にプレミアムプランを解約して、通常プラン（無課金）に戻しますか？\n（デバッグ・テスト用）")) return;
+        const cancelSubscription = async () => {
+          if (!confirm("本当にサブスクリプションを解約しますか？\n解約すると、ただちにプレミアム特典が利用できなくなります。")) return;
 
           try {
             // データベースの user_profiles テーブルで is_premium フラグを無課金に上書き
@@ -1867,17 +1867,17 @@
               .eq('id', currentUser.value);
 
             if (error) {
-              console.error('ダウングレードエラー:', error);
-              alert('プラン変更に失敗しました: ' + error.message);
+              console.error('解約エラー:', error);
+              alert('解約処理に失敗しました: ' + error.message);
               return;
             }
 
             // ローカルのUI状態を即座に通常プランに切り替え
             isPremium.value = false;
-            alert("通常プラン（無課金）に戻りました。");
+            alert("サブスクリプションを解約し、通常プランに戻りました。");
           } catch (e) {
             console.error('予期せぬエラー:', e);
-            alert('ダウングレード処理中にエラーが発生しました。');
+            alert('解約処理中に予期せぬエラーが発生しました。');
           }
         };
 
@@ -3837,7 +3837,7 @@
           selfIntro, saveSelfIntro, friendCount, addDummyFriend, friendLogs,
           addExp, checkBadges, showLevelUp, levelUpMessage, showBadgeToast, badgeToastMessage,
 
-          showBenefitScreen, showGPlayModal, isProcessingPayment, doGooglePlayPurchase, downgradeToFreePlan,
+          showBenefitScreen, showGPlayModal, isProcessingPayment, doGooglePlayPurchase, cancelSubscription,
           showInterstitialAd, adCountdown, triggerInterstitial, closeInterstitialAd,
 
           examCountdownString, isExamLive, startMockExam,
