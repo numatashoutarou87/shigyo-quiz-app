@@ -1017,8 +1017,7 @@
                 <h2 style="font-size: 16px;">{{ myFarmName || 'マイファーム' }}</h2>
                 <div style="display: flex; gap: 8px;">
                   <button @click="debugDeleteAllFarms" style="background:#000; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">⚠️ デバッグ：全ファーム削除</button>
-                  <button v-if="!isFirmOwner" @click="leaveFirm" style="background:#C62828; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">🚪 脱退</button>
-                  <button v-if="isFirmOwner" @click="dissolveFarm" style="background:#B71C1C; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">💥 解散</button>
+                  <button @click="leaveFirm" style="background:#C62828; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">🚪 ファームを脱退する</button>
                 </div>
               </header>
               <div class="firm-chat-section" style="flex:1; display:flex; flex-direction:column;">
@@ -3335,92 +3334,55 @@
         };
 
         const leaveFirm = async () => {
-          if (confirm('本当にこのファームを脱退しますか？\n※これまでのファームチャット履歴は見られなくなります。')) {
-            try {
-              // データベースから自分自身のレコードを完全に物理削除
-              const { error } = await supa
-                .from('farm_members')
-                .delete()
-                .eq('farm_id', myFarmId.value)
-                .eq('user_id', currentUser.value);
-                
-              if (error) {
-                console.error('脱退エラー:', error);
-                alert('脱退処理に失敗しました。');
-                return;
-              }
-              
-              isFarmMember.value = false;
-              firmJoinRoute.value = 'lobby';
-              firmChat.value = [];
-              myFarmId.value = '';
-              myFarmName.value = '';
-              alert('ファームを脱退しました。');
-            } catch (e) {
-              console.error(e);
-              alert('エラーが発生しました。');
-            }
-          }
-        };
-
-        const dissolveFarm = async () => {
           if (!myFarmId.value) return;
 
-          const confirmFirst = confirm('【警告】本当にファームを解散しますか？\n全てのチャット履歴とメンバー情報が完全に消去され、元に戻せません。');
-          if (!confirmFirst) return;
-
-          console.log("解散処理を開始します。対象ファームID:", myFarmId.value);
-          const targetFarmId = myFarmId.value;
+          const confirmLeave = confirm("本当にこのファームを脱退しますか？");
+          if (!confirmLeave) return;
 
           try {
-            // 【ステップ1】このファームの全チャットメッセージを先に完全削除
-            // ※既存の仕様に合わせてテーブル名 'messages', カラム名 'room_id' で削除します
-            const { error: msgError } = await supa
-              .from('messages')
-              .delete()
-              .eq('room_id', 'farm_room_' + targetFarmId);
-              
-            if (msgError) console.error("メッセージ削除中にエラー（無視して続行します）:", msgError);
+            const targetFarmId = myFarmId.value;
 
-            // 【ステップ2】このファームの全メンバー行（自分も含む全員）を完全削除
-            // これにより、メンバー全員の所属データが消え、自動的に全員が「ファーム未所属状態」になります！
-            const { error: memError } = await supa
+            // 1. 自分の所属データを farm_members から物理削除
+            const { error: deleteError } = await supa
               .from('farm_members')
               .delete()
+              .eq('farm_id', targetFarmId)
+              .eq('user_id', currentUser.value);
+
+            if (deleteError) {
+              alert("脱退処理に失敗しました: " + deleteError.message);
+              return;
+            }
+
+            // 2. 脱退成功後、このファームに残っているアクティブなメンバー数をカウント
+            const { data: remainingMembers, error: countError } = await supa
+              .from('farm_members')
+              .select('user_id')
               .eq('farm_id', targetFarmId);
 
-            if (memError) {
-              console.error("メンバー行の削除に失敗しました:", memError);
-              alert("解散処理（メンバー削除）に失敗しました: " + memError.message);
-              return;
+            // 3. 【自動消滅システム】もし残りのメンバーが「0人」なら、ファーム本体とチャット履歴を完全に抹消する
+            if (!countError && (!remainingMembers || remainingMembers.length === 0)) {
+              console.log("ファームのメンバーが0人になったため、自動消滅処理を実行します。");
+              
+              // チャットメッセージの削除 (既存の仕様に合わせて room_id で削除)
+              await supa.from('messages').delete().eq('room_id', 'farm_room_' + targetFarmId);
+              // ファーム本体の削除
+              await supa.from('farms').delete().eq('id', targetFarmId);
             }
 
-            // 【ステップ3】外堀が埋まったので、最後にファーム本体を完全に削除！
-            const { error: farmError } = await supa
-              .from('farms')
-              .delete()
-              .eq('id', targetFarmId);
-
-            if (farmError) {
-              console.error("ファーム本体の削除に失敗しました:", farmError);
-              alert("ファーム本体の削除に失敗しました: " + farmError.message);
-              return;
-            }
-
-            // 【ステップ4】ノーリロードで画面の状態（所属フラグなど）をクリアし、ホーム（ロビー）へ遷移
-            alert("ファームを解散しました。");
+            // 4. 自分自身の画面を「未所属状態」に切り替える（リロードなしで即時反映）
+            alert("ファームを脱退しました。");
             
-            // JavaScript側の所属状態変数を初期化
             isFarmMember.value = false;
             isFirmOwner.value = false;
             firmJoinRoute.value = 'lobby';
             firmChat.value = [];
             myFarmId.value = '';
             myFarmName.value = '';
-            
+
           } catch (e) {
-            console.error('予期せぬファーム解散エラー:', e);
-            alert('解散処理中に予期せぬエラーが発生しました: ' + e.message);
+            console.error(e);
+            alert("エラーが発生しました。");
           }
         };
 
@@ -3817,7 +3779,7 @@
           examCountdownString, isExamLive, startMockExam,
           examQueue, examCurrentIndex, examCurrentQuestion, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
-          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, openFarmMembers, dissolveFarm,
+          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, openFarmMembers,
           firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm, myFarmName, debugDeleteAllFarms,
           friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge
