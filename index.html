@@ -601,7 +601,6 @@
 
             <div class="dashboard-header">
               <h1>一問一答 道場</h1>
-              <p style="color:var(--accent-gold-light); font-size:14px;">レベル＆称号システム対応</p>
             </div>
             
             <div class="status-card">
@@ -2928,6 +2927,25 @@
           if (!fn) return;
 
           try {
+            // ▼▼▼ 重複チェックロジックここから ▼▼▼
+            // Supabase上で既に同じファーム名が存在するか検索
+            const { data: existingFarm, error: checkError } = await supa
+              .from('farms')
+              .select('name')
+              .eq('name', fn);
+
+            if (checkError) {
+              console.error('ファーム名重複チェックエラー:', checkError);
+              throw checkError;
+            }
+
+            // もし1件でもヒットした場合、処理を安全に中断しinsertさせない
+            if (existingFarm && existingFarm.length > 0) {
+              alert('このファーム名はすでに存在します。別の名前を入力してください。');
+              return; 
+            }
+            // ▲▲▲ 重複チェックロジックここまで ▲▲▲
+
             // 1. ファームをデータベースに登録
             const { data: newFarm, error: farmError } = await supa
               .from('farms')
@@ -3569,6 +3587,23 @@
             }
 
             try {
+              // ▼▼▼ 重複チェックロジックここから ▼▼▼
+              // Supabase上で既に同じユーザー名が存在するか検索（自分自身の既存の名前は除外）
+              const { data: existingUser, error: checkError } = await supa
+                .from('user_profiles')
+                .select('user_name')
+                .eq('user_name', trimmed)
+                .neq('id', currentUser.value); // 自分自身のレコードは重複とみなさない
+
+              if (checkError) throw checkError;
+
+              // もし1件でもヒットした場合、処理を安全に中断
+              if (existingUser && existingUser.length > 0) {
+                alert('このユーザー名はすでに使用されています。別の名前を入力してください。');
+                return; 
+              }
+              // ▲▲▲ 重複チェックロジックここまで ▲▲▲
+
               // データベースの user_profiles テーブルを確実に更新
               const { error } = await supa
                 .from('user_profiles')
