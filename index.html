@@ -419,13 +419,6 @@
             <p>1日の発言回数制限（10回）が撤廃。ファームや自習室で思う存分議論し、学習効果を高められます。</p>
           </div>
         </div>
-        <div class="benefit-item">
-          <div class="benefit-icon">📚</div>
-          <div class="benefit-text">
-            <h4>模試アーカイブ受講解放</h4>
-            <p>過去に行われた21時一斉模試にいつでも挑戦可能。自分のペースで実力試しができます。</p>
-          </div>
-        </div>
       </div>
       
       <button class="benefit-cta-btn" @click="showGPlayModal = true; showBenefitScreen = false;">
@@ -588,39 +581,6 @@
       <!-- APP MAIN CONTAINER     -->
       <!-- ====================== -->
       <div v-else-if="authScreen === 'app' && activeMode !== null" class="app-main" key="app-main">
-        <!-- 開発用パネル -->
-        <div class="dev-panel">
-          <div class="dev-panel-title" style="display:flex; justify-content:space-between;">
-            <span>⚙️ 開発ツール | 👤 {{ currentUser }}</span>
-            <span style="color:var(--danger-color); cursor:pointer;" @click="resetAllData">全DB消去</span>
-          </div>
-          <div class="dev-controls">
-            <button class="dev-btn" @click="activeMode = null; activeTab = 'home'" style="background: #555;">🔙 モード選択に戻る</button>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="isPremium">
-              <span class="toggle-slider"></span>
-              <span class="toggle-label" style="margin-right:8px;">{{ isPremium ? 'PREMIUM (EXP3倍)' : '無料' }}</span>
-            </label>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="isFarmMember">
-              <span class="toggle-slider"></span>
-              <span class="toggle-label" style="margin-right:8px;">{{ isFarmMember ? 'ファーム: 所属' : 'ファーム: 未所属' }}</span>
-            </label>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="isFirmOwner">
-              <span class="toggle-slider"></span>
-              <span class="toggle-label" style="margin-right:8px;">{{ isFirmOwner ? 'オーナー: 有' : 'オーナー: 無' }}</span>
-            </label>
-            <button class="dev-btn" @click="myFarmId = myFarmId === 'other_farm' ? 'f_123' : 'other_farm'" style="background: #8E44AD;">自分を別ファームの所属にする</button>
-            <button class="dev-btn" @click="forceStartRealMockExam(true)" style="background: #C62828;">🔥強制模試(100問)</button>
-            <button class="dev-btn" @click="addExp(1000000)">EXP+100万</button>
-            <button class="dev-btn" @click="unlockedBadges = ALL_BADGES.map(b=>b.id)" style="background: #E65100;">全バッジ解放</button>
-            <button class="dev-btn" @click="addDummyFriendsMode(5)" style="background: #0F9D58;">ダミーフレンド+5</button>
-            <button class="dev-btn" @click="addDummyFirmMembers(3)" style="background: #0F9D58;">ダミーファームメンバー+3</button>
-            <button class="dev-btn" @click="setAllTo2" style="background: #E65100;">全問2回正解(テスト用)</button>
-            <button class="dev-btn" @click="chatCount = 0" style="background: #C62828;">発言回数リセット</button>
-          </div>
-        </div>
 
         <!-- ローディングオーバーレイ -->
         <div v-if="isLoading" class="loading-overlay">
@@ -1016,7 +976,6 @@
               <header class="header" style="display:flex; justify-content:space-between; align-items:center;">
                 <h2 style="font-size: 16px;">{{ myFarmName || 'マイファーム' }}</h2>
                 <div style="display: flex; gap: 8px;">
-                  <button @click="debugDeleteAllFarms" style="background:#000; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">⚠️ デバッグ：全ファーム削除</button>
                   <button @click="leaveFirm" style="background:#C62828; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">🚪 ファームを脱退する</button>
                 </div>
               </header>
@@ -1114,9 +1073,7 @@
                   
                   <button class="primary-btn" style="background: var(--text-sub); color: white;" @click="doLogout">ログアウト</button>
 
-                  <div style="margin-top: 40px; text-align: center;">
-                    <button @click="triggerDebugFullClear" style="background: #333; color: #666; border: none; padding: 4px 8px; font-size: 10px; cursor: pointer; border-radius: 4px; opacity: 0.5;">[DEBUG] 全問1回正解化</button>
-                  </div>
+
                 </div>
               </div>
             </div>
@@ -1261,7 +1218,7 @@
                 password: 'supabase_auth',
                 isPremium: false, chatCount: 0, lastChatDate: new Date().toDateString(),
                 displayName: session.user.email.split('@')[0].slice(0, 12),
-                modes: { shindanshi: { isFarmMember: true, isFirmOwner: false, myFarmId: 'f_123', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } }
+                modes: { shindanshi: { isFarmMember: false, isFirmOwner: false, myFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } }
               };
               localStorage.setItem('app_users', JSON.stringify(app_users));
             }
@@ -1294,7 +1251,7 @@
         const isPremium = ref(false);
         const isFarmMember = ref(true);
         const isFirmOwner = ref(false);
-        const myFarmId = ref('f_123');
+        const myFarmId = ref('');
         const myFarmName = ref('');
         const totalExp = ref(0);
         
@@ -1423,7 +1380,7 @@
         const expandedSubject = ref(null);
         
         const quizSettings = ref({
-          isRandom: true,
+          isRandom: false,
           excludeMastered: false
         });
 
@@ -1567,7 +1524,7 @@
           }
           if (!u.modes[activeMode.value]) {
             u.modes[activeMode.value] = {
-              isFarmMember: true, isFirmOwner: false, myFarmId: 'f_123', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0,
+              isFarmMember: false, isFirmOwner: false, myFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0,
               unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5,
               friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {},
               masteredBlocks: {}, masteredSubjects: {}, specialTitle: '',
@@ -1578,7 +1535,7 @@
           const m = u.modes[activeMode.value];
           isFarmMember.value = m.isFarmMember;
           isFirmOwner.value = m.isFirmOwner || false;
-          myFarmId.value = m.myFarmId || 'f_123';
+          myFarmId.value = m.myFarmId || '';
           totalExp.value = m.totalExp;
           
           const todayStr = new Date().toDateString();
@@ -1747,7 +1704,7 @@
           }
         };
 
-        const saveUserProfile = async (showDebugAlert = false) => {
+        const saveUserProfile = async () => {
           if (!currentUser.value) return;
           try {
             // スキーマ構造と完全に整合させ、万が一未定義でもエラー落ちしないよう初期値を完備
@@ -1766,13 +1723,6 @@
             if (error) {
               // 致命的エラーではなくワーニングとして処理し、アプリの初期化は止めない（超安全モード）
               console.warn('【プロフ作成警告】スキーマ不一致等による保存エラー（アプリは続行します）:', error.message, error.details);
-              if (showDebugAlert) {
-                alert(`【DB非同期警告】データベースの構造変更によりクラウド保存がスキップされましたが、アプリはそのまま遊べます。\n詳細: ${error.message}`);
-              }
-            } else {
-              if (showDebugAlert) {
-                alert(`【プロフ作成成功】データベースに正常に登録・同期されました！`);
-              }
             }
           } catch (e) {
             console.warn('【プロフ保存例外】未知のエラーをキャッチしましたが、アプリは続行します:', e);
@@ -2015,7 +1965,7 @@
           
           currentUser.value = data.user.id;
           if (!app_users[currentUser.value]) {
-             app_users[currentUser.value] = { password: 'supabase_auth', isPremium: false, chatCount: 0, lastChatDate: new Date().toDateString(), displayName: loginUsername.value.split('@')[0].slice(0, 12), modes: { shindanshi: { isFarmMember: true, isFirmOwner: false, myFarmId: 'f_123', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } } };
+             app_users[currentUser.value] = { password: 'supabase_auth', isPremium: false, chatCount: 0, lastChatDate: new Date().toDateString(), displayName: loginUsername.value.split('@')[0].slice(0, 12), modes: { shindanshi: { isFarmMember: false, isFirmOwner: false, myFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } } };
              localStorage.setItem('app_users', JSON.stringify(app_users));
           }
           
@@ -2055,9 +2005,9 @@
               displayName: regUsername.value.split('@')[0].slice(0, 12),
               modes: {
                 shindanshi: {
-                  isFarmMember: true,
+                  isFarmMember: false,
                   isFirmOwner: false,
-                  myFarmId: 'f_123',
+                  myFarmId: '',
                   totalExp: 0,
                   dailyCorrect: 0,
                   dailyCombo: 0,
@@ -2092,12 +2042,6 @@
           loginPassword.value = '';
           activeMode.value = null;
           authScreen.value = 'login';
-        };
-
-        const resetAllData = () => { 
-          localStorage.clear(); 
-          alert('全ユーザーデータとログイン情報を初期化しました。リロードします。');
-          location.reload();
         };
 
         // --- Navigation ---
@@ -2175,53 +2119,6 @@
           }
         };
 
-        const setAllTo2 = () => {
-          if (rawQuestions.value.length > 0) {
-            rawQuestions.value.forEach(q => {
-              correctCounts.value[q.id] = 2;
-            });
-          } else {
-            for(let i=1; i<=100; i++) {
-              correctCounts.value[i] = 2;
-            }
-          }
-          alert('ロード中の問題をすべて「2回正解状態」にしました。\n※あと1回正解でマスター除外対象になります。');
-        };
-
-        const triggerDebugFullClear = () => {
-          if (!confirm('【警告】全7,000問の正解回数を「+1」します。\nよろしいですか？')) return;
-          
-          isLoading.value = true;
-          loadStatus.value = `デバッグ: 全問クリア処理中...`;
-          
-          setTimeout(() => {
-            const subjCodeMap = {
-              'keizai': 100100000, 'zaimu': 100200000, 'kigyou': 100300000,
-              'unei': 100400000, 'houmu': 100500000, 'jouhou': 100600000, 'chusho': 100700000
-            };
-            const newCounts = {};
-            let clickStage = 0;
-            
-            for (let s of Object.values(subjCodeMap)) {
-              for(let q = 1; q <= 1000; q++) {
-                const current = correctCounts.value[s + q] || 0;
-                newCounts[s + q] = Math.min(current + 1, 3);
-                if (q === 1 && s === 100100000) clickStage = newCounts[s + q];
-              }
-            }
-            correctCounts.value = { ...correctCounts.value, ...newCounts };
-            
-            totalAnswered.value = Math.max(totalAnswered.value, 7000);
-            checkAndUnlockBadge('badge_quiz_02'); // 1,000問
-            checkAndUnlockBadge('badge_quiz_03'); // 5,000問
-            
-            saveUserProfile();
-            
-            isLoading.value = false;
-            alert(`デバッグ処理完了！全7,000問の正解回数を「${clickStage}」に更新しました。\n進捗同期とマスター判定のため画面をリロードします。`);
-            window.location.reload();
-          }, 100);
-        };
 
         // --- LIVE EXAM (21:00) Logic ---
         let serverTimeOffset = 0;
@@ -3009,7 +2906,8 @@
                 alert('申請エラー: ' + error.message);
               }
             } else {
-              alert(`${user.user_name} にフレンド申請を送りました！`);
+              const targetName = user.user_name || user.name || '対象のユーザー';
+              alert(`${targetName} にフレンド申請を送りました！`);
               if (!requestedFriends.value.includes(user.id)) {
                 requestedFriends.value.push(user.id);
               }
@@ -3348,12 +3246,7 @@
                 // 100%確実に「ファームを探す/作る」画面（未所属画面）へ切り替える
                 firmJoinRoute.value = 'lobby';
                 
-                // 最悪の場合に備えて、状態がリセットされていなければ完全に真っ白状態から復帰させるためのリロード（力技のフォールバック）
-                setTimeout(() => {
-                  if (myFarmId.value !== '') {
-                    location.reload(); 
-                  }
-                }, 500);
+                // ※ ここにあった location.reload() はCapacitor不具合防止のため完全に削除しました
               } else if (deletedFarm === myFarmId.value) {
                 // 他の人が抜けた場合はメンバー一覧を更新
                 loadFarmMembers();
@@ -3383,9 +3276,6 @@
           loadFarmMembers();
         };
 
-        const addDummyFirmMembers = (count) => {
-          alert('本物データ連動版になったため、ダミー追加機能は無効化されました。');
-        };
         const firmRoute = ref('chat');
         const showMemberProfileModal = ref(false);
         const activeFirmMember = ref(null);
@@ -3507,7 +3397,26 @@
           try {
             const targetFarmId = myFarmId.value;
 
-            // 1. 自分の所属データを farm_members から物理削除
+            // 1. 【お掃除ロジック】既存のファームIDが本物のUUID形式か判定する
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            const isValidUUID = uuidRegex.test(targetFarmId);
+
+            // 2. ダミーID（"f_123"等）の場合、通信を絶対に実行せずスタンドアロンで状態を初期化
+            if (!isValidUUID) {
+              console.log("レガシーなダミーファームIDを検出しました。Supabase通信をスキップして状態を初期化します。");
+              
+              // 変数と状態のリセットだけでUIを初期画面（ロビー）へ戻す
+              isFarmMember.value = false;
+              isFirmOwner.value = false;
+              myFarmId.value = '';
+              myFarmName.value = '';
+              firmChat.value = [];
+              firmJoinRoute.value = 'lobby';
+              
+              return; // ここで処理を正常終了（通信させない）
+            }
+
+            // 3. 【本物のUUIDの時だけ】Supabaseの farm_members から物理削除を実行
             const { error: deleteError } = await supa
               .from('farm_members')
               .delete()
@@ -3519,13 +3428,13 @@
               return;
             }
 
-            // 2. 脱退成功後、このファームに残っているアクティブなメンバー数をカウント
+            // 4. 脱退成功後、このファームに残っているアクティブなメンバー数をカウント
             const { data: remainingMembers, error: countError } = await supa
               .from('farm_members')
               .select('user_id')
               .eq('farm_id', targetFarmId);
 
-            // 3. 【自動消滅システム】もし残りのメンバーが「0人」なら、ファーム本体とチャット履歴を完全に抹消する
+            // 5. 【自動消滅システム】もし残りのメンバーが「0人」なら、ファーム本体とチャット履歴を完全に抹消する
             if (!countError && (!remainingMembers || remainingMembers.length === 0)) {
               console.log("ファームのメンバーが0人になったため、自動消滅処理を実行します。");
               
@@ -3535,18 +3444,21 @@
               await supa.from('farms').delete().eq('id', targetFarmId);
             }
 
-            // 4. 自分自身の画面を「未所属状態」に切り替える（リロードなしで即時反映）
+            // 6. 自分自身の画面を「未所属状態」に切り替える（リロードなしで即時反映）
             alert("ファームを脱退しました。");
             
+            // 所属状態・ファーム情報の完全クリア
             isFarmMember.value = false;
             isFirmOwner.value = false;
-            firmJoinRoute.value = 'lobby';
-            firmChat.value = [];
             myFarmId.value = '';
             myFarmName.value = '';
+            firmChat.value = [];
+            
+            // 画面描画をファーム未所属のロビー画面へリアルタイムで切り替え
+            firmJoinRoute.value = 'lobby';
 
           } catch (e) {
-            console.error(e);
+            console.error("ファーム脱退エラー:", e);
             alert("エラーが発生しました。");
           }
         };
@@ -3643,26 +3555,6 @@
           }
         };
 
-        const debugDeleteAllFarms = async () => {
-          if (!confirm('【警告】Supabase上のすべてのファーム、ファームメンバー、ファームチャット履歴を完全に削除してリセットしますか？\n※テスト用のデバッグ機能です')) return;
-          try {
-            // farm_room_ で始まるメッセージを削除
-            await supa.from('messages').delete().like('room_id', 'farm_room_%');
-            // farm_members テーブルを全削除
-            await supa.from('farm_members').delete().neq('user_id', '00000000-0000-0000-0000-000000000000');
-            // farms テーブルを全削除
-            await supa.from('farms').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-            
-            alert('全ファーム関連データをリセットしました！ページをリロードします。');
-            location.reload();
-          } catch (e) {
-            console.error('全ファーム削除エラー:', e);
-            alert('削除中にエラーが発生しました。');
-          }
-        };
-
-
-
         const editDisplayName = async () => {
           const newName = prompt('新しいユーザー名を入力してください (最大12文字)', displayName.value);
           if (newName !== null) {
@@ -3728,42 +3620,6 @@
             console.error("自己紹介の保存で予期せぬエラー:", e);
             alert("自己紹介の保存中にエラーが発生しました。");
           }
-        };
-
-        const addDummyFriend = () => {
-          if (!isPremium.value && friendCount.value >= 15) {
-            showPaywall('フレンド枠の上限 (15人)', '無料プランではフレンドを15人までしか追加できません。プレミアムに加入すると拡張されます！');
-            return;
-          }
-          friendCount.value++;
-          if (friendCount.value >= 1) checkAndUnlockBadge('badge_comm_04');
-          if (friendCount.value >= 10) checkAndUnlockBadge('badge_comm_05');
-          alert('フレンドを追加しました！（ダミー）');
-        };
-
-        const addDummyFriendsMode = (count) => {
-          if (!activeMode.value) return;
-          const icons = ['👨', '👩', '👦', '👧', '👨‍🦰', '👩‍🦰', '👱‍♂️', '👱‍♀️', '👴', '👵'];
-          const names = ['佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '山本', '中村', '小林', '加藤'];
-          const badges = ['🔰 新人', '🔥 熱血', '📚 勉強鬼', '🏆 ランカー', '✨ 期待の新星'];
-          for (let i=0; i<count; i++) {
-            const id = 'f_' + Math.random().toString(36).substr(2, 9);
-            const lv = Math.floor(Math.random() * 50) + 1;
-            const titleIdx = Math.floor((lv - 1) / 5);
-            const title = TITLES[Math.min(titleIdx, 19)];
-            friendsList.value.push({
-              id,
-              name: names[Math.floor(Math.random() * names.length)] + 'さん',
-              icon: icons[Math.floor(Math.random() * icons.length)],
-              level: lv,
-              title: title,
-              badge: badges[Math.floor(Math.random() * badges.length)]
-            });
-          }
-          friendCount.value += count;
-          if (friendCount.value >= 1) checkAndUnlockBadge('badge_comm_04');
-          if (friendCount.value >= 10) checkAndUnlockBadge('badge_comm_05');
-          alert(`現在のモードにダミーフレンドを${count}人追加しました。`);
         };
 
         const removeFriend = async (friend) => {
@@ -3963,7 +3819,7 @@
 
         return {
           authScreen, currentUser, loginUsername, loginPassword, loginError, doLogin, activeMode, selectMode,
-          regUsername, regPassword, regIntro, regError, doRegister, doLogout, resetAllData,
+          regUsername, regPassword, regIntro, regError, doRegister, doLogout,
           agreedToTerms, showTermsModal, showPrivacyModal,
 
           isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, currentTitle, currentLevel, nextLevelExp, currentLevelStartExp, expProgressPercent, remainingExpToNext,
@@ -3975,7 +3831,7 @@
           
           masteredBlocks, masteredSubjects, showConfetti, celebrationMessage, celebrationTitle,
           
-          goToStudyRoomLobby, setAllTo2, triggerDebugFullClear,
+          goToStudyRoomLobby,
           SUBJECTS, STUDY_ROOMS, lobbyActiveTab, expandedSubject, quizSettings, correctCounts,
           activeRoom, getRoomStatusText, getRoomStatusClass, enterRoomNew, startQuizFlow,
           quizQueue, currentQuestionIndex, currentQuestion, isFinished, showFeedback, isCorrect, correctCount, handleAnswer, nextQuestion,
@@ -3983,7 +3839,7 @@
           studyLogs, studyChatInput, sendStudyChat, openStudyUserProfile, editDisplayName,
           firmMembers, firmChat, firmChatInput, sendFirmChat,
           
-          selfIntro, saveSelfIntro, friendCount, addDummyFriend, friendLogs,
+          selfIntro, saveSelfIntro, friendCount, friendLogs,
           addExp, checkBadges, showLevelUp, levelUpMessage, showBadgeToast, badgeToastMessage,
 
           showBenefitScreen, showGPlayModal, isProcessingPayment, doGooglePlayPurchase, cancelSubscription,
@@ -3992,9 +3848,9 @@
           examCountdownString, isExamLive, forceStartRealMockExam, isMockDebugMode,
           examQueue, examCurrentIndex, examCurrentQuestion, currentExamSubjectName, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
-          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, addDummyFirmMembers, openFarmMembers,
-          firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm, myFarmName, debugDeleteAllFarms,
-          friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, addDummyFriendsMode, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
+          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, openFarmMembers,
+          firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm, myFarmName,
+          friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge
         };
       }
