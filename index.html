@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>士業向 コミュニティ学習アプリ</title>
+  <title>士業ドリル</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="capacitor.js"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
@@ -353,6 +354,7 @@
     .auth-btn:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; transform: none; }
     
     /* Reaction Styles */
+    
   </style>
 </head>
 <body>
@@ -457,9 +459,25 @@
     <div v-if="showBadgeModal" class="badge-modal-overlay" style="align-items: center; justify-content: center; z-index: 9999; padding: 20px;">
       <div class="badge-modal" style="width: 100%; max-width: 600px; max-height: 90vh; background: var(--primary-navy); display: flex; flex-direction: column; padding: 0;">
         <div class="badge-modal-header" style="padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; background: #112240; border-top-left-radius: 20px; border-top-right-radius: 20px;">
-          <h3 style="margin: 0; color: var(--accent-gold);">🎖️ バッジコレクション ({{ unlockedBadges.length }} / {{ ALL_BADGES.length }})</h3>
+          <h3 style="margin: 0; color: var(--accent-gold);">🎖️ バッジコレクション ({{ validBadgeCount }} / {{ ALL_BADGES.length }})</h3>
         </div>
         <div class="badge-grid" style="overflow-y: auto; padding: 20px; flex: 1; display: grid; grid-template-columns: 1fr; gap: 12px; display: block;">
+          
+          <!-- バッジ無し（装備解除）の選択肢 -->
+          <div style="margin-bottom: 20px;">
+            <div :class="{'badge-card-active': !activeBadge || activeBadge === '', 'badge-card-unlocked': true}"
+                 @click="equipBadge('')"
+                 style="border-radius: 12px; padding: 12px; background: rgba(255,255,255,0.05); border: 2px solid transparent; display: flex; align-items: center; gap: 12px; transition: all 0.3s; cursor: pointer;">
+              <div style="font-size: 32px; background: rgba(255,255,255,0.1); border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                👤
+              </div>
+              <div style="flex: 1;">
+                <div style="font-weight: bold; color: white; font-size: 14px;">バッジ無し（装備解除）</div>
+                <div v-if="!activeBadge || activeBadge === ''" style="font-size: 10px; color: var(--accent-gold); font-weight: bold;">装備中</div>
+              </div>
+            </div>
+          </div>
+
           <div v-for="cat in ['profile', 'quiz', 'community', 'exam', 'farm']" :key="cat">
             <h4 style="color: white; margin-bottom: 10px; border-left: 4px solid var(--accent-gold); padding-left: 8px; text-transform: uppercase;">{{ cat }}</h4>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-bottom: 20px;">
@@ -514,39 +532,81 @@
     <transition name="fade" mode="out-in">
       
       <!-- ====================== -->
-      <!-- AUTH: LOGIN            -->
+      <!-- AUTH: LOGIN -->
       <!-- ====================== -->
       <div v-if="authScreen === 'login'" class="screen auth-screen" key="auth-login">
         <div class="auth-card">
-          <h2>ログイン</h2>
-          <div v-if="loginError" class="auth-error">{{ loginError }}</div>
-          <input type="email" v-model="loginUsername" placeholder="メールアドレス" class="auth-input" @keyup.enter="doLogin">
-          <input type="password" v-model="loginPassword" placeholder="パスワード" class="auth-input" @keyup.enter="doLogin">
-          <button class="auth-btn" @click="doLogin">ログインして学習開始</button>
-          <span class="auth-link" @click="authScreen = 'register'">アカウントを新規作成する</span>
+          <h2>士業ドリル ログイン</h2>
+          
+          <div class="auth-input-group" style="margin-bottom: 15px;">
+            <input type="text" id="auth-username" v-model="loginUsername" placeholder="ユーザー名" style="width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px;">
+            <input type="password" id="auth-password" v-model="loginPassword" placeholder="パスワード" style="width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+            <button class="primary-btn" :disabled="!loginUsername || !loginPassword" @click="doLogin" :style="(!loginUsername || !loginPassword) ? 'background: #eee; color: #999; cursor: not-allowed;' : ''">ログイン</button>
+            <div style="text-align: center; font-size: 14px;">
+              <a href="#" @click.prevent="switchAuthMode('register')" style="color: var(--primary-navy); text-decoration: underline;">新規登録はこちら</a>
+            </div>
+          </div>
+          <p style="font-size: 11px; color: #666; margin-top: 15px;">※メールアドレス不要。ユーザー名とパスワードのみでログインできます。</p>
         </div>
       </div>
 
       <!-- ====================== -->
-      <!-- AUTH: REGISTER         -->
+      <!-- AUTH: REGISTER -->
       <!-- ====================== -->
       <div v-else-if="authScreen === 'register'" class="screen auth-screen" key="auth-register">
         <div class="auth-card">
-          <h2>新規アカウント作成</h2>
-          <div v-if="regError" class="auth-error">{{ regError }}</div>
-          <input type="email" v-model="regUsername" placeholder="メールアドレス" class="auth-input">
-          <input type="password" v-model="regPassword" placeholder="パスワード" class="auth-input">
-          <textarea v-model="regIntro" placeholder="自己紹介コメント" class="auth-input" style="height:60px; resize:none;"></textarea>
+          <h2>士業ドリル 新規登録</h2>
           
-          <div class="terms-checkbox-container">
-            <input type="checkbox" id="agreeTerms" v-model="agreedToTerms">
-            <label for="agreeTerms">
-              <span class="terms-link" @click.stop="showTermsModal = true">利用規約</span> と <span class="terms-link" @click.stop="showPrivacyModal = true">プライバシーポリシー</span> に同意する
+          <!-- 利用規約＆プライバシーポリシー表示エリア -->
+          <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <div style="flex: 1;">
+              <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px; color: var(--primary-navy); text-align: center;">利用規約</div>
+              <div class="terms-scroll-box" style="max-height: 120px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; font-size: 11px; background: #fff; color: #333; text-align: left;">
+                <p style="margin:0 0 6px 0; font-weight:bold;">第1条（目的）</p>
+                <p style="margin:0 0 8px 0;">本規約は「士業ドリル」（以下、当アプリ）が提供する学習支援サービスの利用条件を定めるものです。</p>
+                <p style="margin:0 0 6px 0; font-weight:bold;">第2条（アカウント管理）</p>
+                <p style="margin:0 0 8px 0;">ユーザーは自己の責任においてユーザー名およびパスワードを厳重に管理するものとします。</p>
+                <p style="margin:0 0 6px 0; font-weight:bold;">第3条（禁止事項）</p>
+                <p style="margin:0 0 8px 0;">不正アクセス、他ユーザーへの迷惑行為、当アプリのコンテンツの無断転載・複製などを禁止します。</p>
+                <p style="margin:0 0 6px 0; font-weight:bold;">第4条（免責事項）</p>
+                <p style="margin:0 0 0 0;">当アプリは提供する情報の正確性に努めますが、試験の合格や結果を保証するものではありません。また、システム中断等により生じた損害について一切の責任を負いません。</p>
+              </div>
+            </div>
+            <div style="flex: 1;">
+              <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px; color: var(--primary-navy); text-align: center;">プライバシーポリシー</div>
+              <div class="terms-scroll-box" style="max-height: 120px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; font-size: 11px; background: #fff; color: #333; text-align: left;">
+                <p style="margin:0 0 6px 0; font-weight:bold;">第1条（個人情報の非取得）</p>
+                <p style="margin:0 0 8px 0;">当アプリは、ユーザーから氏名、メールアドレス、電話番号、その他個人を特定できる情報（個人情報）を一切取得いたしません。</p>
+                <p style="margin:0 0 6px 0; font-weight:bold;">第2条（収集する情報および利用目的）</p>
+                <p style="margin:0 0 8px 0;">当アプリが収集する情報は、アカウント識別用の「ユーザー名」「パスワード（暗号化保存）」およびアプリ内での「学習ログ（バッジ獲得状況、自習室の利用履歴、ファーム・チャット等の利用データ）」のみとなります。これらの情報は、アプリの機能提供、ユーザー識別、サービス改善および不具合対応の目的にのみ利用します。</p>
+                <p style="margin:0 0 6px 0; font-weight:bold;">第3条（データの管理と第三者提供）</p>
+                <p style="margin:0 0 0 0;">収集したデータは適切に管理し、法令に基づく場合を除き、第三者に提供することは一切ありません。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="terms-checkbox-container" style="margin-bottom: 20px; text-align: center;">
+            <input type="checkbox" id="agreeTermsLogin" v-model="agreedToTerms">
+            <label for="agreeTermsLogin" style="font-size: 12px; font-weight: bold; color: var(--primary-navy); cursor: pointer;">
+              上記の内容を確認し、同意して登録する
             </label>
           </div>
 
-          <button class="auth-btn" :disabled="!agreedToTerms" @click="doRegister">登録して自動ログイン</button>
-          <span class="auth-link" @click="authScreen = 'login'">← ログイン画面へ戻る</span>
+          <div class="auth-input-group" style="margin-bottom: 15px;">
+            <input type="text" id="auth-username-reg" v-model="loginUsername" placeholder="ユーザー名" style="width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px;">
+            <input type="password" id="auth-password-reg" v-model="loginPassword" placeholder="パスワード" style="width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+            <button class="primary-btn" :disabled="!agreedToTerms || !loginUsername || !loginPassword" @click="doRegister" :style="(!agreedToTerms || !loginUsername || !loginPassword) ? 'background: #eee; color: #999; cursor: not-allowed;' : 'background: var(--secondary-navy);'">アカウントを新規作成</button>
+            <div style="text-align: center; font-size: 14px;">
+              <a href="#" @click.prevent="switchAuthMode('login')" style="color: var(--primary-navy); text-decoration: underline;">ログイン画面に戻る</a>
+            </div>
+          </div>
+          <p style="font-size: 11px; color: #666; margin-top: 15px;">※メールアドレス不要。ユーザー名とパスワードのみで登録できます。</p>
         </div>
       </div>
 
@@ -600,7 +660,7 @@
             </div>
 
             <div class="dashboard-header">
-              <h1>一問一答 道場</h1>
+              <h1>士業ドリル</h1>
             </div>
             
             <div class="status-card">
@@ -832,7 +892,7 @@
                 <div class="friend-item" v-for="f in filteredFriends" :key="f.id" @click="openDirectChat(f)" style="position:relative; padding-right: 60px;">
                   <div class="friend-icon">{{ f.icon }}</div>
                   <div class="friend-info">
-                    <div class="friend-name"><span style="color:var(--accent-gold); font-size:12px; margin-right:4px;">[{{ f.badge || '🔰 新人' }}]</span>{{ f.name }}</div>
+                    <div class="friend-name"><span style="color:var(--accent-gold); font-size:12px; margin-right:4px;">[{{ f.badge || '' }}]</span>{{ f.name }}</div>
                     <div class="friend-level">Lv.{{ f.level }} ・ {{ f.title || 'アソシエイト（見習い）' }}</div>
                   </div>
                   <div style="display: flex; gap: 15px; align-items: center; position: absolute; right: 15px; top: 50%; transform: translateY(-50%);">
@@ -1029,9 +1089,9 @@
                       <div class="profile-avatar">👤</div>
                       <div class="profile-badge-tag">{{ activeBadgeDisplay }}</div>
                     </div>
-                    <div class="profile-name">
-                      {{ displayName }}
-                      <button @click="editDisplayName" style="font-size:16px; margin-left:8px; border:none; background:transparent; cursor:pointer;" title="名前を変更">✏️</button>
+                    <div class="profile-name-container" style="margin-bottom: 12px; margin-top: 10px;">
+                      <label style="font-size: 11px; color: #888; display: block; text-align: center; margin-bottom: 4px;">ユーザー名（変更不可）</label>
+                      <input type="text" :value="displayName" readonly disabled style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background-color: #f3f4f6; color: #9ca3af; font-size: 16px; font-weight: bold; box-sizing: border-box; text-align: center; pointer-events: none;">
                     </div>
                     <div class="profile-title">{{ currentTitle }}</div>
                     
@@ -1181,6 +1241,7 @@
     const SUPABASE_URL = 'https://rpotoheaclduasytlfbv.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_26VxZwpI-640Lq59h3BR7w_k91jiwhM';
     const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const GoogleAuth = window.Capacitor?.Plugins?.GoogleAuth;
 
     const { createApp, ref, computed, watch, onMounted } = Vue;
 
@@ -1209,27 +1270,96 @@
         }
 
         onMounted(async () => {
-          const { data: { session } } = await supa.auth.getSession();
-          if (session) {
-            currentUser.value = session.user.id;
-            if (!app_users[currentUser.value]) {
-              app_users[currentUser.value] = {
-                password: 'supabase_auth',
-                isPremium: false, chatCount: 0, lastChatDate: new Date().toDateString(),
-                displayName: session.user.email.split('@')[0].slice(0, 12),
-                modes: { shindanshi: { isFarmMember: false, isFirmOwner: false, myFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } }
-              };
-              localStorage.setItem('app_users', JSON.stringify(app_users));
-            }
-            loadGlobalData();
-            await syncUserProfile(currentUser.value);
-            // 既存セッション（自動ログイン）時にも強制upsertしてプロフィールを確実化
-            saveUserProfile(true);
-            await loadPendingRequests();
-            await loadFriendsList();
-            setupRealtimeFriendships();
-            authScreen.value = 'app';
+          // --- AdMobバナー広告の初期化と表示 ---
+          try {
+            const { AdMob } = window.Capacitor.Plugins;
+            await AdMob.initialize({ requestTrackingAuthorization: true });
+            
+            const showBannerAction = async () => {
+              await AdMob.showBanner({
+                adId: 'ca-app-pub-3940256099942544/6300978111',
+                position: 'BOTTOM_CENTER',
+                size: 'BANNER',
+                margin: 50,
+                isTesting: true
+              });
+            };
+            await showBannerAction();
+          } catch (err) {
+            console.warn("AdMobは未対応の環境です");
           }
+
+          // 次回起動時のためのユーザー名・パスワード自動補完
+          const savedUsername = localStorage.getItem('remembered_username');
+          const savedPassword = localStorage.getItem('remembered_password');
+          
+          if (savedUsername && savedPassword) {
+            // Vueのリアクティブデータにセット（UIへ自動反映）
+            loginUsername.value = savedUsername;
+            loginPassword.value = savedPassword;
+            
+            // 念のためネイティブDOMへの直接セットも実行
+            setTimeout(() => {
+              const usernameInput = document.getElementById('auth-username');
+              const passwordInput = document.getElementById('auth-password');
+              if (usernameInput) usernameInput.value = savedUsername;
+              if (passwordInput) passwordInput.value = savedPassword;
+            }, 100);
+          }
+
+          // 【除霊】旧仕様のダミーログイン記憶（test3333等）がローカルストレージに残っていれば完全に消去
+          if (localStorage.getItem('currentUser')) {
+            localStorage.removeItem('currentUser');
+          }
+          
+          const checkSession = async () => {
+            const { data: { session } } = await supa.auth.getSession();
+            
+            if (session && session.user) {
+              // Google認証経由のセッションかチェック（ダミーのEmail/Passwordログインは弾く）
+              if (session.user.app_metadata?.provider !== 'google') {
+                console.warn('ダミーログインのセッションを検出したため、強制ログアウトします。');
+                await supa.auth.signOut();
+                authScreen.value = 'login';
+                return;
+              }
+
+              // 有効なGoogleセッションがある場合のみ初期化
+              currentUser.value = session.user.id;
+              
+              if (!app_users[currentUser.value]) {
+                app_users[currentUser.value] = {
+                  password: 'supabase_auth',
+                  isPremium: false, chatCount: 0, lastChatDate: new Date().toDateString(),
+                  displayName: (session.user.user_metadata?.name || session.user.email.split('@')[0]).slice(0, 12),
+                  modes: { shindanshi: { isFarmMember: false, isFirmOwner: false, myFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: [], activeBadge: '', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } }
+                };
+                localStorage.setItem('app_users', JSON.stringify(app_users));
+              }
+              
+              loadGlobalData();
+              await syncUserProfile(currentUser.value);
+              saveUserProfile(true);
+              await loadPendingRequests();
+              await loadFriendsList();
+              setupRealtimeFriendships();
+              
+              authScreen.value = 'app';
+            } else {
+              // セッションがない場合は未ログイン状態を徹底
+              authScreen.value = 'login';
+            }
+          };
+
+          await checkSession();
+
+          // 万が一のセッション変更時も監視（他タブでのログアウト等に対応）
+          supa.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_OUT' || !session) {
+              currentUser.value = null;
+              authScreen.value = 'login';
+            }
+          });
         });
 
         const loginUsername = ref('');
@@ -1248,6 +1378,80 @@
 
         // Reactive Stats
         const isPremium = ref(false);
+        
+        // --- 課金中枢コントロールオブジェクト（ShigyoIAP） ---
+        const ShigyoIAP = {
+          async init(supabaseUserId) {
+            try {
+              const { Purchases } = window.Capacitor?.Plugins || {};
+              if (!Purchases) return;
+              
+              await Purchases.configure({
+                apiKey: "goog_xxxxxxxxxxxxxxxxxxxxxxxxxxx", // 仮のRevenueCat API Key
+                appUserID: supabaseUserId
+              });
+              
+              const info = await Purchases.getCustomerInfo();
+              if (info.entitlements.active["premium_access"]) {
+                this.enablePremiumUI();
+              }
+            } catch (err) {
+              console.warn("IAP Init Error:", err);
+            }
+          },
+          
+          enablePremiumUI() {
+            isPremium.value = true;
+            // 課金時はAdMobバナーのコンテナを非表示に
+            const adContainer = document.getElementById('ad-container');
+            if (adContainer) {
+              adContainer.style.display = 'none';
+            }
+          },
+          
+          async loadOfferings() {
+            try {
+              const { Purchases } = window.Capacitor?.Plugins || {};
+              if (!Purchases) {
+                alert("ブラウザ環境では購入できません。実機でお試しください。");
+                return;
+              }
+              const offerings = await Purchases.getOfferings();
+              if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
+                // 仮で最初のパッケージを購入対象とする
+                const packageToBuy = offerings.current.availablePackages[0];
+                const { customerInfo } = await Purchases.purchasePackage({ packageIdentifier: packageToBuy.identifier });
+                
+                if (customerInfo.entitlements.active["premium_access"]) {
+                  this.enablePremiumUI();
+                  alert("プレミアムプランの購入が完了しました！");
+                }
+              }
+            } catch (err) {
+              console.error("Purchase Error:", err);
+              if (!err.userCancelled) alert("購入処理に失敗しました。");
+            }
+          },
+          
+          async restorePurchases() {
+            try {
+              const { Purchases } = window.Capacitor?.Plugins || {};
+              if (!Purchases) return;
+              const customerInfo = await Purchases.restorePurchases();
+              
+              if (customerInfo.entitlements.active["premium_access"]) {
+                this.enablePremiumUI();
+                alert("購入履歴を正常に復元しました！");
+              } else {
+                alert("有効なプレミアム権利が見つかりませんでした。");
+              }
+            } catch (err) {
+              console.error("Restore Error:", err);
+              alert("復元処理に失敗しました。");
+            }
+          }
+        };
+
         const isFarmMember = ref(true);
         const isFirmOwner = ref(false);
         const myFarmId = ref('');
@@ -1257,8 +1461,8 @@
         const dailyCorrect = ref(0);
         const dailyCombo = ref(0);
         const maxCombo = ref(0);
-        const unlockedBadges = ref(['🔰 新人']);
-        const activeBadge = ref('🔰 新人');
+        const unlockedBadges = ref([]);
+        const activeBadge = ref('');
 
         const selfIntro = ref('');
         const friendCount = ref(5);
@@ -1433,13 +1637,19 @@
           return b ? `${b.icon} ${b.name}` : activeBadge.value;
         });
 
+        const validBadgeCount = computed(() => {
+          if (!unlockedBadges.value || !Array.isArray(unlockedBadges.value)) return 0;
+          // 有効なID（ALL_BADGESに実際に存在するID）のみを純粋にカウント
+          return unlockedBadges.value.filter(id => ALL_BADGES.some(b => b.id === id)).length;
+        });
+
         const equipBadge = async (badgeId) => {
-          if (unlockedBadges.value.includes(badgeId)) {
+          if (badgeId === '' || unlockedBadges.value.includes(badgeId)) {
             try {
               // データベースの user_profiles テーブルを確実に更新（他ユーザーへのリアルタイム反映用）
               const { error } = await supa
                 .from('user_profiles')
-                .update({ active_badge: badgeId })
+                .update({ active_badge: badgeId || null })
                 .eq('id', currentUser.value);
 
               if (error) {
@@ -1510,8 +1720,8 @@
                 dailyCorrect: u.dailyCorrect || 0,
                 dailyCombo: u.dailyCombo || 0,
                 maxCombo: u.maxCombo || 0,
-                unlockedBadges: u.unlockedBadges || ['🔰 新人'],
-                activeBadge: u.activeBadge || '🔰 新人',
+                unlockedBadges: u.unlockedBadges || [],
+                activeBadge: u.activeBadge || '',
                 selfIntro: u.selfIntro || '',
                 friendCount: u.friendCount || 5,
                 friendsList: [],
@@ -1524,7 +1734,7 @@
           if (!u.modes[activeMode.value]) {
             u.modes[activeMode.value] = {
               isFarmMember: false, isFirmOwner: false, myFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0,
-              unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5,
+              unlockedBadges: [], activeBadge: '', selfIntro: '', friendCount: 5,
               friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {},
               masteredBlocks: {}, masteredSubjects: {}, specialTitle: '',
               totalAnswered: 0, consecutiveLogins: 0, totalLogins: 0, examParticipatedCount: 0, likesSentCount: 0, lastLoginDate: ''
@@ -1575,8 +1785,8 @@
             }, 1000);
           }
           
-          unlockedBadges.value = m.unlockedBadges || ['🔰 新人'];
-          activeBadge.value = m.activeBadge || '🔰 新人';
+          unlockedBadges.value = m.unlockedBadges || [];
+          activeBadge.value = m.activeBadge || '';
           selfIntro.value = m.selfIntro || '';
           friendCount.value = m.friendCount || 5;
           friendsList.value = m.friendsList || [];
@@ -1603,21 +1813,21 @@
                 id: userId,
                 total_exp: 0,
                 level: 1,
-                unlocked_badges: ['🔰 新人'],
-                active_badge: '🔰 新人',
+                unlocked_badges: [],
+                active_badge: '',
                 is_premium: false,
                 bio: ''
               };
               await supa.from('user_profiles').insert([newProfile]);
               totalExp.value = 0;
-              unlockedBadges.value = ['🔰 新人'];
-              activeBadge.value = '🔰 新人';
+              unlockedBadges.value = [];
+              activeBadge.value = '';
               isPremium.value = false;
               selfIntro.value = '';
             } else if (data) {
               totalExp.value = data.total_exp || 0;
-              unlockedBadges.value = data.unlocked_badges || ['🔰 新人'];
-              activeBadge.value = data.active_badge || '🔰 新人';
+              unlockedBadges.value = data.unlocked_badges || [];
+              activeBadge.value = data.active_badge || '';
               isPremium.value = data.is_premium || false;
               selfIntro.value = data.bio || '';
               
@@ -1732,8 +1942,6 @@
           loadGlobalData();
         }
 
-
-
         // Auto Save Watcher
         watch([isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, dailyCorrect, dailyCombo, maxCombo, unlockedBadges, activeBadge, selfIntro, friendCount, chatCount, friendsList, directChats, requestedFriends, correctCounts, totalAnswered, consecutiveLogins, totalLogins, examParticipatedCount, likesSentCount, masteredBlocks], () => {
           if (!currentUser.value || !app_users[currentUser.value]) return;
@@ -1830,6 +2038,32 @@
 
         // --- Google Play & Ads ---
         const showBenefitScreen = ref(false);
+        
+        // --- 💡 AdMobバナー制御：プレミアム画面の開閉と連動 ---
+        watch(showBenefitScreen, async (isOpened) => {
+          try {
+            const { AdMob } = window.Capacitor?.Plugins || {};
+            if (!AdMob) return;
+            
+            if (isOpened) {
+              // プレミアム画面が表示されている間はバナー広告を隠す
+              await AdMob.hideBanner();
+            } else {
+              // 画面を閉じた時、未課金であればバナー広告を再表示する
+              if (!isPremium.value) {
+                await AdMob.showBanner({
+                  adId: 'ca-app-pub-3940256099942544/6300978111',
+                  position: 'BOTTOM_CENTER',
+                  size: 'BANNER',
+                  margin: 50,
+                  isTesting: true
+                });
+              }
+            }
+          } catch (err) {
+            console.warn("AdMob Banner Toggle Error:", err);
+          }
+        });
         const showGPlayModal = ref(false);
         const isProcessingPayment = ref(false);
 
@@ -1951,96 +2185,150 @@
           }
         };
 
-        const doLogin = async () => {
-          loginError.value = '';
-          if (!loginUsername.value || !loginPassword.value) { loginError.value = '入力内容が不足しています'; return; }
-          
-          const { data, error } = await supa.auth.signInWithPassword({
-            email: loginUsername.value,
-            password: loginPassword.value,
-          });
-          
-          if (error) { loginError.value = 'ログイン失敗: ' + error.message; return; }
-          
-          currentUser.value = data.user.id;
-          if (!app_users[currentUser.value]) {
-             app_users[currentUser.value] = { password: 'supabase_auth', isPremium: false, chatCount: 0, lastChatDate: new Date().toDateString(), displayName: loginUsername.value.split('@')[0].slice(0, 12), modes: { shindanshi: { isFarmMember: false, isFirmOwner: false, myFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: ['🔰 新人'], activeBadge: '🔰 新人', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } } };
-             localStorage.setItem('app_users', JSON.stringify(app_users));
-          }
-          
-          loadGlobalData();
-          await syncUserProfile(currentUser.value);
-          // 新規ユーザー対策：ログイン直後にプロフィールを強制upsertして検索可能にする
-          saveUserProfile(true);
-          await loadPendingRequests();
-          await loadFriendsList();
-          setupRealtimeFriendships();
-          
-          activeMode.value = null;
-          authScreen.value = 'app';
+        const switchAuthMode = (mode) => {
+          authScreen.value = mode;
+          loginUsername.value = '';
+          loginPassword.value = '';
+          agreedToTerms.value = false;
         };
 
         const doRegister = async () => {
-          regError.value = '';
-          if (!regUsername.value || !regPassword.value) { regError.value = '入力内容が不足しています'; return; }
-          if (!agreedToTerms.value) { regError.value = '利用規約とプライバシーポリシーへの同意が必要です'; return; }
-          
-          const { data, error } = await supa.auth.signUp({
-            email: regUsername.value,
-            password: regPassword.value,
-          });
-          
-          if (error) { regError.value = '登録失敗: ' + error.message; return; }
-          if (!data.user) { regError.value = 'このメールアドレスは既に登録されています。ログイン画面からログインするか、別のアドレスをお試しください。'; return; }
-
-          currentUser.value = data.user.id;
-          
-          if (!app_users[currentUser.value]) {
-            app_users[currentUser.value] = {
-              password: 'supabase_auth',
-              isPremium: false,
-              chatCount: 0,
-              lastChatDate: new Date().toDateString(),
-              displayName: regUsername.value.split('@')[0].slice(0, 12),
-              modes: {
-                shindanshi: {
-                  isFarmMember: false,
-                  isFirmOwner: false,
-                  myFarmId: '',
-                  totalExp: 0,
-                  dailyCorrect: 0,
-                  dailyCombo: 0,
-                  maxCombo: 0,
-                  unlockedBadges: ['🔰 新人'],
-                  activeBadge: '🔰 新人',
-                  selfIntro: regIntro.value,
-                  friendCount: 5,
-                  friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {}
-                }
+          if (!loginUsername.value || !loginPassword.value) return;
+          try {
+            isLoading.value = true;
+            // メアド形式にするためダミードメインを付与
+            const fakeEmail = encodeURIComponent(loginUsername.value) + '@shigyo-drill.local';
+            const { data, error } = await supa.auth.signUp({
+              email: fakeEmail,
+              password: loginPassword.value,
+              options: {
+                data: { name: loginUsername.value }
               }
-            };
-            localStorage.setItem('app_users', JSON.stringify(app_users));
+            });
+
+            if (error) {
+              if (error.message.includes('already registered')) {
+                throw new Error("このユーザー名は既に登録されています。");
+              }
+              throw error;
+            }
+
+            // 登録直後はそのままログイン扱いにする
+            await handleLoginSuccess(data.user);
+            
+            // 次回から自動入力させるためローカルストレージに保存
+            localStorage.setItem('remembered_username', loginUsername.value);
+            localStorage.setItem('remembered_password', loginPassword.value);
+            
+            alert("新規登録が完了しました！");
+          } catch (err) {
+            console.error('Registration Error:', err);
+            alert("登録エラー: " + (err.message || JSON.stringify(err)));
+          } finally {
+            isLoading.value = false;
           }
+        };
+
+        const doLogin = async () => {
+          if (!loginUsername.value || !loginPassword.value) return;
+          try {
+            isLoading.value = true;
+            const fakeEmail = encodeURIComponent(loginUsername.value) + '@shigyo-drill.local';
+            const { data, error } = await supa.auth.signInWithPassword({
+              email: fakeEmail,
+              password: loginPassword.value
+            });
+
+            if (error) throw new Error("ユーザー名またはパスワードが違います");
+
+            await handleLoginSuccess(data.user);
+
+            // 次回から自動入力させるためローカルストレージに保存
+            localStorage.setItem('remembered_username', loginUsername.value);
+            localStorage.setItem('remembered_password', loginPassword.value);
+
+            alert(`士業ドリルへようこそ、${displayName.value}さん！`);
+          } catch (err) {
+            console.error('Login Error:', err);
+            alert("ログインエラー: " + (err.message || JSON.stringify(err)));
+          } finally {
+            isLoading.value = false;
+          }
+        };
+
+        const handleLoginSuccess = async (user) => {
+          currentUser.value = user.id;
           
+          const { data: p } = await supa.from('user_profiles').select('*').eq('id', currentUser.value).single();
+          if(p) {
+            displayName.value = p.user_name || 'ゲスト';
+            totalExp.value = p.total_exp || 0;
+            currentLevel.value = p.level || 1;
+            unlockedBadges.value = p.unlocked_badges || [];
+            if(p.completed_blocks) {
+              p.completed_blocks.forEach(b => masteredBlocks.value[b] = true);
+            }
+          } else {
+            displayName.value = user.user_metadata?.name || loginUsername.value || 'ユーザー';
+            
+            if (!app_users[currentUser.value]) {
+              app_users[currentUser.value] = {
+                password: 'supabase_auth',
+                isPremium: false,
+                chatCount: 0,
+                lastChatDate: new Date().toDateString(),
+                displayName: displayName.value.slice(0, 12),
+                modes: {
+                  shindanshi: {
+                    isFarmMember: false, isFirmOwner: false, myFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: [], activeBadge: '', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {}
+                  }
+                }
+              };
+              localStorage.setItem('app_users', JSON.stringify(app_users));
+            }
+          }
+
           loadGlobalData();
           await syncUserProfile(currentUser.value);
-          // 新規ユーザー対策：登録直後にプロフィールを強制upsertして検索可能にする
           saveUserProfile(true);
           await loadPendingRequests();
           await loadFriendsList();
           setupRealtimeFriendships();
           
+          // ログイン成功時にIAPを安全に初期化（プレミアム判定の実行）
+          await ShigyoIAP.init(user.id);
+
           activeMode.value = null;
           authScreen.value = 'app';
         };
 
         const doLogout = async () => {
-          await supa.auth.signOut();
-          currentUser.value = null;
-          loginUsername.value = '';
-          loginPassword.value = '';
-          activeMode.value = null;
-          authScreen.value = 'login';
+          try {
+            await supa.auth.signOut();
+          } catch (e) {
+            console.error('Logout error:', e);
+          } finally {
+            // 完全初期化
+            currentUser.value = null;
+            displayName.value = 'ユーザー';
+            myFarmId.value = '';
+            totalExp.value = 0;
+            currentLevel.value = 1;
+            unlockedBadges.value = [];
+            
+            // 旧仕様のダミー変数が残らないようにリセット
+            loginUsername.value = '';
+            loginPassword.value = '';
+            regUsername.value = '';
+            regPassword.value = '';
+            
+            activeMode.value = null;
+            authScreen.value = 'login';
+            
+            // ダミー除霊: 古いテストユーザーが残らないようクリア
+            localStorage.removeItem('app_users');
+            app_users = {};
+          }
         };
 
         // --- Navigation ---
@@ -2519,7 +2807,7 @@
                     const matchedBadge = ALL_BADGES.find(b => b.id === badgeId);
                     if (matchedBadge) {
                       specialTitle.value = matchedBadge.name;
-                      activeBadge.value = matchedBadge.id;
+                      // activeBadge.value = matchedBadge.id; // 自動装備を禁止
                     }
                   }
                   saveUserProfile();
@@ -2544,7 +2832,7 @@
                       const legendBadge = ALL_BADGES.find(b => b.id === 'badge_quiz_13');
                       if (legendBadge) {
                         specialTitle.value = legendBadge.name;
-                        activeBadge.value = legendBadge.id;
+                        // activeBadge.value = legendBadge.id; // 自動装備を禁止
                         saveUserProfile();
                       }
                     }, 4000);
@@ -2621,10 +2909,10 @@
         };
 
         const getDisplayBadge = (badges) => {
-          if (!badges || badges.length === 0) return '🔰 新人';
+          if (!badges || badges.length === 0) return '';
           const badgeId = badges[badges.length - 1];
           const b = ALL_BADGES.find(x => x.id === badgeId);
-          return b ? `${b.icon} ${b.name}` : '🔰 新人';
+          return b ? `${b.icon} ${b.name}` : '';
         };
 
         const loadFriendsList = async () => {
@@ -3573,58 +3861,7 @@
           }
         };
 
-        const editDisplayName = async () => {
-          const newName = prompt('新しいユーザー名を入力してください (最大12文字)', displayName.value);
-          if (newName !== null) {
-            const trimmed = newName.trim();
-            if (!trimmed) {
-              alert('ユーザー名は空白にできません。');
-              return;
-            }
-            if (trimmed.length > 12) {
-              alert('ユーザー名は12文字以内で入力してください。');
-              return;
-            }
 
-            try {
-              // ▼▼▼ 重複チェックロジックここから ▼▼▼
-              // Supabase上で既に同じユーザー名が存在するか検索（自分自身の既存の名前は除外）
-              const { data: existingUser, error: checkError } = await supa
-                .from('user_profiles')
-                .select('user_name')
-                .eq('user_name', trimmed)
-                .neq('id', currentUser.value); // 自分自身のレコードは重複とみなさない
-
-              if (checkError) throw checkError;
-
-              // もし1件でもヒットした場合、処理を安全に中断
-              if (existingUser && existingUser.length > 0) {
-                alert('このユーザー名はすでに使用されています。別の名前を入力してください。');
-                return; 
-              }
-              // ▲▲▲ 重複チェックロジックここまで ▲▲▲
-
-              // データベースの user_profiles テーブルを確実に更新
-              const { error } = await supa
-                .from('user_profiles')
-                .update({ user_name: trimmed })
-                .eq('id', currentUser.value);
-
-              if (error) {
-                alert('名前変更エラー: ' + error.message);
-                return;
-              }
-
-              // 更新が成功したら、画面上のUIも新しい名前に即時反映
-              displayName.value = trimmed;
-              alert('ユーザー名を変更しました！');
-            } catch (e) {
-              console.error('名前変更で予期せぬエラー:', e);
-              alert('名前変更中にエラーが発生しました。');
-            }
-          }
-        };
-        
         const saveSelfIntro = async () => {
           const text = selfIntro.value.trim();
           if (text.length > 200) {
@@ -3853,12 +4090,13 @@
         });
 
         return {
-          authScreen, currentUser, loginUsername, loginPassword, loginError, doLogin, activeMode, selectMode,
-          regUsername, regPassword, regIntro, regError, doRegister, doLogout,
+          ShigyoIAP,
+          authScreen, currentUser, loginUsername, loginPassword, loginError, doLogin, doRegister, switchAuthMode, activeMode, selectMode,
+          regUsername, regPassword, regIntro, regError, doLogout,
           agreedToTerms, showTermsModal, showPrivacyModal,
 
           isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, currentTitle, currentLevel, nextLevelExp, currentLevelStartExp, expProgressPercent, remainingExpToNext,
-          chatCount, canSendChat, dailyCorrect, dailyCombo, unlockedBadges, activeBadge, activeBadgeDisplay,
+          chatCount, canSendChat, dailyCorrect, dailyCombo, unlockedBadges, activeBadge, activeBadgeDisplay, validBadgeCount,
           activeTab, studyRoute, profileTab,
           loadStatus, isLoading, paywallConfig, showPaywall,
           
@@ -3871,7 +4109,7 @@
           activeRoom, getRoomStatusText, getRoomStatusClass, enterRoomNew, startQuizFlow,
           quizQueue, currentQuestionIndex, currentQuestion, isFinished, showFeedback, isCorrect, correctCount, handleAnswer, nextQuestion,
           
-          studyLogs, studyChatInput, sendStudyChat, openStudyUserProfile, editDisplayName,
+          studyLogs, studyChatInput, sendStudyChat, openStudyUserProfile,
           firmMembers, firmChat, firmChatInput, sendFirmChat,
           
           selfIntro, saveSelfIntro, friendCount, friendLogs,
