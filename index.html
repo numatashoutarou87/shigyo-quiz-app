@@ -1807,37 +1807,60 @@
 
         const syncUserProfile = async (userId) => {
           try {
-            const { data, error } = await supa.from('user_profiles').select('*').eq('id', userId).single();
-            if (error && error.code === 'PGRST116') {
+            const currentMode = activeMode.value || 'shindanshi';
+            
+            // 1. 親テーブル（user_profiles）の取得
+            const { data: pData, error: pError } = await supa.from('user_profiles').select('*').eq('id', userId).single();
+            if (pError && pError.code === 'PGRST116') {
               const newProfile = {
                 id: userId,
-                total_exp: 0,
-                level: 1,
-                unlocked_badges: [],
-                active_badge: '',
+                current_mode: currentMode,
                 is_premium: false,
                 bio: ''
               };
               await supa.from('user_profiles').insert([newProfile]);
-              totalExp.value = 0;
-              unlockedBadges.value = [];
-              activeBadge.value = '';
               isPremium.value = false;
               selfIntro.value = '';
-            } else if (data) {
-              totalExp.value = data.total_exp || 0;
-              unlockedBadges.value = data.unlocked_badges || [];
-              activeBadge.value = data.active_badge || '';
-              isPremium.value = data.is_premium || false;
-              selfIntro.value = data.bio || '';
+            } else if (pData) {
+              isPremium.value = pData.is_premium || false;
+              selfIntro.value = pData.bio || '';
+              if (pData.current_mode && !activeMode.value) {
+                activeMode.value = pData.current_mode;
+              }
+            }
+
+            // 2. 子テーブル（user_progress）の取得
+            const actualMode = activeMode.value || currentMode;
+            const { data: progData, error: progError } = await supa.from('user_progress').select('*').eq('user_id', userId).eq('profession_code', actualMode).single();
+            
+            if (progError && progError.code === 'PGRST116') {
+              const newProgress = {
+                user_id: userId,
+                profession_code: actualMode,
+                total_exp: 0,
+                level: 1,
+                unlocked_badges: [],
+                active_badge: '',
+                completed_blocks: []
+              };
+              await supa.from('user_progress').insert([newProgress]);
+              totalExp.value = 0;
+              currentLevel.value = 1;
+              unlockedBadges.value = [];
+              activeBadge.value = '';
+            } else if (progData) {
+              totalExp.value = progData.total_exp || 0;
+              currentLevel.value = progData.level || 1;
+              unlockedBadges.value = progData.unlocked_badges || [];
+              activeBadge.value = progData.active_badge || '';
               
-              if (data.completed_blocks && Array.isArray(data.completed_blocks)) {
+              if (progData.completed_blocks && Array.isArray(progData.completed_blocks)) {
                 const loadedMB = {};
-                data.completed_blocks.forEach(key => loadedMB[key] = true);
+                progData.completed_blocks.forEach(key => loadedMB[key] = true);
                 masteredBlocks.value = loadedMB;
-                // loadModeData で上書きされないようにローカルキャッシュも更新
-                if (app_users[userId] && app_users[userId].modes && app_users[userId].modes['shindanshi']) {
-                  app_users[userId].modes['shindanshi'].masteredBlocks = loadedMB;
+                // 現在のモードに合わせてローカルキャッシュも動的に更新
+                if (app_users[userId] && app_users[userId].modes && app_users[userId].modes[actualMode]) {
+                  app_users[userId].modes[actualMode].masteredBlocks = loadedMB;
                 }
               }
             }
@@ -1916,23 +1939,30 @@
         const saveUserProfile = async () => {
           if (!currentUser.value) return;
           try {
-            // スキーマ構造と完全に整合させ、万が一未定義でもエラー落ちしないよう初期値を完備
+            const currentMode = activeMode.value || 'shindanshi';
+            
+            // 1. 親プロフィールの保存 (user_profiles)
             const profile = {
               id: currentUser.value,
               user_name: displayName.value || 'ゲスト',
-              title: currentTitle.value || '新米',
+              current_mode: currentMode
+            };
+            const { error: pError } = await supa.from('user_profiles').upsert([profile]);
+            if (pError) console.warn('user_profiles 保存エラー:', pError.message);
+            
+            // 2. 士業ごとの進行状況の保存 (user_progress)
+            const progress = {
+              user_id: currentUser.value,
+              profession_code: currentMode,
               total_exp: totalExp.value || 0,
               level: currentLevel.value || 1,
               unlocked_badges: unlockedBadges.value || [],
-              // active_badge: activeBadge.value, // 意図的除外: Supabase側スキーマエラー回避のための安全策
+              active_badge: activeBadge.value || '',
               completed_blocks: Object.keys(masteredBlocks.value || {}) || []
             };
-            const { data, error } = await supa.from('user_profiles').upsert([profile]);
+            const { error: progError } = await supa.from('user_progress').upsert([progress]);
+            if (progError) console.warn('user_progress 保存エラー:', progError.message);
             
-            if (error) {
-              // 致命的エラーではなくワーニングとして処理し、アプリの初期化は止めない（超安全モード）
-              console.warn('【プロフ作成警告】スキーマ不一致等による保存エラー（アプリは続行します）:', error.message, error.details);
-            }
           } catch (e) {
             console.warn('【プロフ保存例外】未知のエラーをキャッチしましたが、アプリは続行します:', e);
           }
