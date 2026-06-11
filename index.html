@@ -43,7 +43,7 @@
     /* --- Mode Selection Screen --- */
     .mode-select-screen { background: var(--primary-navy); padding: 40px 20px; overflow-y: auto; align-items: center; justify-content: flex-start; }
     .mode-select-title { color: var(--accent-gold); font-size: 24px; font-weight: bold; margin-bottom: 30px; text-align: center; letter-spacing: 2px; margin-top: 20px; }
-    .mode-card { width: 100%; max-width: 340px; background: white; border-radius: 16px; padding: 24px; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); transition: 0.3s; position: relative; overflow: hidden; }
+    .mode-card { flex-shrink: 0; width: 100%; max-width: 340px; background: white; border-radius: 16px; padding: 24px; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); transition: 0.3s; position: relative; overflow: hidden; }
     .mode-card.active { border: 3px solid var(--accent-gold); cursor: pointer; }
     .mode-card.active:hover { transform: translateY(-4px); box-shadow: 0 15px 40px rgba(212, 175, 55, 0.4); }
     .mode-card.disabled { filter: grayscale(100%); opacity: 0.7; cursor: not-allowed; }
@@ -355,10 +355,114 @@
     
     /* Reaction Styles */
     
+    /* Tutorial Carousel */
+    .tutorial-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 100000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tutorial-modal {
+      background: white;
+      width: 90%;
+      max-width: 400px;
+      border-radius: 20px;
+      padding: 24px 20px;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .tutorial-skip-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .tutorial-slides-container {
+      width: 100%;
+      overflow: hidden;
+      margin-top: 20px;
+      min-height: 260px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .tutorial-slide {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    .tutorial-image-placeholder {
+      width: 120px;
+      height: 120px;
+      background: #f0f4f8;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      font-size: 45px;
+      color: var(--primary-navy);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .tutorial-title {
+      font-size: 18px;
+      color: var(--primary-navy);
+      margin-bottom: 12px;
+      font-weight: bold;
+    }
+    .tutorial-desc {
+      font-size: 14px;
+      color: #555;
+      line-height: 1.6;
+      margin: 0;
+    }
+    .tutorial-footer {
+      width: 100%;
+      margin-top: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .tutorial-dots {
+      display: flex;
+      gap: 8px;
+    }
+    .tutorial-dot {
+      width: 8px;
+      height: 8px;
+      background: #ddd;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+    .tutorial-dot.active {
+      background: var(--primary-navy);
+      transform: scale(1.3);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
   </style>
 </head>
 <body>
   <div id="app" class="app-container" v-cloak>
+
+
     
     <!-- LEVEL UP OVERLAY -->
     <div v-if="showLevelUp" class="levelup-overlay">
@@ -559,36 +663,14 @@
       <div v-else-if="authScreen === 'register'" class="screen auth-screen" key="auth-register">
         <div class="auth-card">
           <h2>士業ドリル 新規登録</h2>
-          
-          <!-- 利用規約＆プライバシーポリシー表示エリア -->
-          <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-            <div style="flex: 1;">
-              <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px; color: var(--primary-navy); text-align: center;">利用規約</div>
-              <div class="terms-scroll-box" style="max-height: 120px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; font-size: 11px; background: #fff; color: #333; text-align: left;">
-                <p style="margin:0 0 6px 0; font-weight:bold;">第1条（目的）</p>
-                <p style="margin:0 0 8px 0;">本規約は「士業ドリル」（以下、当アプリ）が提供する学習支援サービスの利用条件を定めるものです。</p>
-                <p style="margin:0 0 6px 0; font-weight:bold;">第2条（アカウント管理）</p>
-                <p style="margin:0 0 8px 0;">ユーザーは自己の責任においてユーザー名およびパスワードを厳重に管理するものとします。</p>
-                <p style="margin:0 0 6px 0; font-weight:bold;">第3条（禁止事項）</p>
-                <p style="margin:0 0 8px 0;">不正アクセス、他ユーザーへの迷惑行為、当アプリのコンテンツの無断転載・複製などを禁止します。</p>
-                <p style="margin:0 0 6px 0; font-weight:bold;">第4条（免責事項）</p>
-                <p style="margin:0 0 0 0;">当アプリは提供する情報の正確性に努めますが、試験の合格や結果を保証するものではありません。また、システム中断等により生じた損害について一切の責任を負いません。</p>
-              </div>
+            
+            <!-- 利用規約・プライバシーポリシーリンク -->
+            <div style="text-align: center; margin-top: 15px; margin-bottom: 20px; font-size: 13px;">
+              <a href="#" @click.prevent="authScreen = 'terms'" style="color: var(--primary-navy); text-decoration: underline; margin-right: 20px; font-weight: bold;">利用規約を読む</a>
+              <a href="#" @click.prevent="authScreen = 'privacy'" style="color: var(--primary-navy); text-decoration: underline; font-weight: bold;">プライバシーポリシーを読む</a>
             </div>
-            <div style="flex: 1;">
-              <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px; color: var(--primary-navy); text-align: center;">プライバシーポリシー</div>
-              <div class="terms-scroll-box" style="max-height: 120px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; font-size: 11px; background: #fff; color: #333; text-align: left;">
-                <p style="margin:0 0 6px 0; font-weight:bold;">第1条（個人情報の非取得）</p>
-                <p style="margin:0 0 8px 0;">当アプリは、ユーザーから氏名、メールアドレス、電話番号、その他個人を特定できる情報（個人情報）を一切取得いたしません。</p>
-                <p style="margin:0 0 6px 0; font-weight:bold;">第2条（収集する情報および利用目的）</p>
-                <p style="margin:0 0 8px 0;">当アプリが収集する情報は、アカウント識別用の「ユーザー名」「パスワード（暗号化保存）」およびアプリ内での「学習ログ（バッジ獲得状況、自習室の利用履歴、ファーム・チャット等の利用データ）」のみとなります。これらの情報は、アプリの機能提供、ユーザー識別、サービス改善および不具合対応の目的にのみ利用します。</p>
-                <p style="margin:0 0 6px 0; font-weight:bold;">第3条（データの管理と第三者提供）</p>
-                <p style="margin:0 0 0 0;">収集したデータは適切に管理し、法令に基づく場合を除き、第三者に提供することは一切ありません。</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="terms-checkbox-container" style="margin-bottom: 20px; text-align: center;">
+            
+            <div class="terms-checkbox-container" style="margin-bottom: 20px; text-align: center;">
             <input type="checkbox" id="agreeTermsLogin" v-model="agreedToTerms">
             <label for="agreeTermsLogin" style="font-size: 12px; font-weight: bold; color: var(--primary-navy); cursor: pointer;">
               上記の内容を確認し、同意して登録する
@@ -607,6 +689,44 @@
             </div>
           </div>
           <p style="font-size: 11px; color: #666; margin-top: 15px;">※メールアドレス不要。ユーザー名とパスワードのみで登録できます。</p>
+        </div>
+      </div>
+
+<!-- 利用規約画面 -->
+      <div v-else-if="authScreen === 'terms'" class="screen auth-screen" key="auth-terms" style="overflow-y: auto;">
+        <div class="auth-card" style="text-align: left;">
+          <h2 style="text-align: center; margin-bottom: 20px;">利用規約</h2>
+          <div style="font-size: 13px; line-height: 1.6; color: #333;">
+            <p style="margin:0 0 6px 0; font-weight:bold;">第1条（目的）</p>
+            <p style="margin:0 0 15px 0;">本規約は「士業ドリル」（以下、当アプリ）が提供する学習支援サービスの利用条件を定めるものです。</p>
+            <p style="margin:0 0 6px 0; font-weight:bold;">第2条（アカウント管理）</p>
+            <p style="margin:0 0 15px 0;">ユーザーは自己の責任においてユーザー名およびパスワードを厳重に管理するものとします。</p>
+            <p style="margin:0 0 6px 0; font-weight:bold;">第3条（禁止事項）</p>
+            <p style="margin:0 0 15px 0;">不正アクセス、他ユーザーへの迷惑行為、当アプリのコンテンツの無断転載・複製などを禁止します。</p>
+            <p style="margin:0 0 6px 0; font-weight:bold;">第4条（免責事項）</p>
+            <p style="margin:0 0 15px 0;">当アプリは提供する情報の正確性に努めますが、試験の合格や結果を保証するものではありません。また、システム中断等により生じた損害について一切の責任を負いません。</p>
+          </div>
+          <div style="text-align: center; margin-top: 20px;">
+            <button class="primary-btn" @click="authScreen = 'register'">戻る</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- プライバシーポリシー画面 -->
+      <div v-else-if="authScreen === 'privacy'" class="screen auth-screen" key="auth-privacy" style="overflow-y: auto;">
+        <div class="auth-card" style="text-align: left;">
+          <h2 style="text-align: center; margin-bottom: 20px;">プライバシーポリシー</h2>
+          <div style="font-size: 13px; line-height: 1.6; color: #333;">
+            <p style="margin:0 0 6px 0; font-weight:bold;">第1条（個人情報の非取得）</p>
+            <p style="margin:0 0 15px 0;">当アプリは、ユーザーから氏名、メールアドレス、電話番号、その他個人を特定できる情報（個人情報）を一切取得いたしません。</p>
+            <p style="margin:0 0 6px 0; font-weight:bold;">第2条（収集する情報および利用目的）</p>
+            <p style="margin:0 0 15px 0;">当アプリが収集する情報は、アカウント識別用の「ユーザー名」「パスワード（暗号化保存）」およびアプリ内での「学習ログ（バッジ獲得状況、自習室の利用履歴、ファーム・チャット等の利用データ）」のみとなります。これらの情報は、アプリの機能提供、ユーザー識別、サービス改善および不具合対応の目的にのみ利用します。</p>
+            <p style="margin:0 0 6px 0; font-weight:bold;">第3条（データの管理と第三者提供）</p>
+            <p style="margin:0 0 15px 0;">収集したデータは適切に管理し、法令に基づく場合を除き、第三者に提供することは一切ありません。</p>
+          </div>
+          <div style="text-align: center; margin-top: 20px;">
+            <button class="primary-btn" @click="authScreen = 'register'">戻る</button>
+          </div>
         </div>
       </div>
 
@@ -908,7 +1028,7 @@
                 <button class="back-btn" @click="friendRoute = 'list'" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
                 <h2 style="color: var(--bg-white);">ユーザーを探す</h2>
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
-                  <input type="text" v-model="userSearchQuery" placeholder="ユーザー名で検索..." class="friend-search" style="flex: 1; margin: 0;" @keyup.enter="searchUsers">
+                  <input type="text" v-model="userSearchQuery" placeholder="ユーザー名で検索..." class="friend-search" style="flex: 1; margin: 0;" @keyup.enter="searchUsers" @focus="handleInputFocus" @blur="handleInputBlur">
                   <button class="primary-btn" @click="searchUsers" style="width: auto; padding: 0 15px; margin: 0;">検索</button>
                 </div>
               </div>
@@ -1005,7 +1125,8 @@
                         <div class="friend-name" style="font-size: 14px; margin-bottom: 4px; color: var(--primary-navy);">{{ f.name }} <span style="font-size:11px; color:#888; font-weight:normal;">({{ f.members || 1 }}/10人)</span></div>
                         <div class="friend-level" style="color: #666; font-size: 11px; line-height: 1.4;">{{ f.description || f.intro }}</div>
                       </div>
-                      <button class="primary-btn" @click="joinFirm(f)" style="padding: 6px 12px; font-size: 11px; width: auto;">加入</button>
+                      <button v-if="f.id === myPendingFarmId" class="primary-btn" style="padding: 6px 12px; font-size: 11px; width: auto; background: #888; color: white;" disabled>承認待ち</button>
+                      <button v-else class="primary-btn" @click="joinFirm(f)" :disabled="!!myPendingFarmId" style="padding: 6px 12px; font-size: 11px; width: auto;">加入申請</button>
                     </div>
                   </div>
                 </div>
@@ -1035,8 +1156,13 @@
               <header class="header" style="display:flex; justify-content:space-between; align-items:center;">
                 <h2 style="font-size: 16px;">{{ myFarmName || 'マイファーム' }}</h2>
                 <div style="display: flex; gap: 8px;">
-                  <button @click="leaveFirm" style="background:#C62828; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">🚪 ファームを脱退する</button>
-                </div>
+                    <button v-if="isFirmOwner" @click="firmRoute = 'pending_members'" style="background:#FF9800; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer; position:relative;">
+                      承認待ち
+                      <span v-if="firmPendingMembers.length > 0" style="position:absolute; top:-4px; right:-4px; background:red; color:white; font-size:10px; padding:2px 6px; border-radius:10px;">{{ firmPendingMembers.length }}</span>
+                    </button>
+                    <button @click="openFarmMembers" style="background:#2E7D32; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">メンバー</button>
+                    <button @click="leaveFirm" style="background:#C62828; color:white; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; font-size:12px; cursor:pointer;">脱退</button>
+                  </div>
               </header>
               <div class="firm-chat-section" style="flex:1; display:flex; flex-direction:column;">
                 <div style="font-size:11px; color:#888; text-align:right; margin-bottom:5px;">本日の送信枠: {{ isPremium ? '無制限' : (10 - chatCount) + '/10' }}</div>
@@ -1068,8 +1194,35 @@
                       <div class="friend-level">Lv.{{ m.level }} ・ {{ m.title }}</div>
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                      <button v-if="isFirmOwner && m.farmId === myFarmId" @click.stop="kickFirmMember(m)" style="background:#C62828; color:white; border:none; padding:6px 10px; border-radius:8px; font-weight:bold; font-size:11px; cursor:pointer;">キック</button>
+                      <button v-if="isFirmOwner && m.farmId === myFarmId && m.id !== currentUser" @click.stop="appointFirmLeader(m)" style="background:#2E7D32; color:white; border:none; padding:6px 10px; border-radius:8px; font-weight:bold; font-size:11px; cursor:pointer; margin-right:4px;">任命</button>
+                      <button v-if="isFirmOwner && m.farmId === myFarmId && m.id !== currentUser" @click.stop="kickFirmMember(m)" style="background:#C62828; color:white; border:none; padding:6px 10px; border-radius:8px; font-weight:bold; font-size:11px; cursor:pointer;">キック</button>
                       <div style="color: var(--accent-gold); font-size: 14px; font-weight:bold;">プロフ</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB: PENDING MEMBERS (承認待ち) -->
+            <div v-else-if="firmRoute === 'pending_members'" class="firm-members-screen">
+              <header class="header" style="display:flex; align-items:center;">
+                <button class="back-btn" @click="firmRoute = 'chat'" style="position: static; margin-right: 15px; font-size: 14px;">◀ 戻る</button>
+                <h2>承認待ち一覧</h2>
+              </header>
+              <div style="padding:15px; overflow-y:auto; flex:1;">
+                <div v-if="firmPendingMembers.length === 0" style="text-align:center; padding:20px; color:#888; font-size:14px;">
+                  現在、承認待ちのユーザーはいません。
+                </div>
+                <div class="friend-list" v-else>
+                  <div class="friend-item" v-for="m in firmPendingMembers" :key="m.id" style="cursor:default;">
+                    <div class="friend-icon" @click="openMemberProfile(m)" style="cursor:pointer;">👤</div>
+                    <div class="friend-info" @click="openMemberProfile(m)" style="cursor:pointer;">
+                      <div class="friend-name"><span style="color:var(--accent-gold); font-size:12px; margin-right:4px;">[{{ m.badge }}]</span>{{ m.name }}</div>
+                      <div class="friend-level">Lv.{{ m.level }} ・ {{ m.title }}</div>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <button @click.stop="approveFirmMember(m)" style="background:#2E7D32; color:white; border:none; padding:6px 10px; border-radius:8px; font-weight:bold; font-size:11px; cursor:pointer;">承認</button>
+                      <button @click.stop="rejectFirmMember(m)" style="background:#C62828; color:white; border:none; padding:6px 10px; border-radius:8px; font-weight:bold; font-size:11px; cursor:pointer;">拒否</button>
                     </div>
                   </div>
                 </div>
@@ -1140,7 +1293,7 @@
         </transition>
 
         <!-- Bottom Ad Banner -->
-        <div v-if="!isPremium" class="ad-banner">
+        <div v-if="!isPremium && !isKeyboardVisible" class="ad-banner">
           [AD] ここにスポンサー広告が表示されます
         </div>
 
@@ -1229,6 +1382,37 @@
           </div>
           <div class="terms-modal-footer">
             <button class="primary-btn" style="background: var(--accent-gold); color: var(--primary-navy);" onclick="closeCelebration()">閉じる</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TUTORIAL CAROUSEL -->
+      <div v-if="showTutorial" class="tutorial-overlay">
+        <div class="tutorial-modal">
+          <button class="tutorial-skip-btn" @click="completeTutorial">スキップ</button>
+          
+          <div class="tutorial-slides-container" 
+               @touchstart="handleTouchStart" 
+               @touchend="handleTouchEnd">
+            <div class="tutorial-slide" :key="tutorialSlideIndex">
+              <div class="tutorial-image-placeholder">
+                <i class="tutorial-icon">{{ tutorialSlides[tutorialSlideIndex].icon }}</i>
+              </div>
+              <h2 class="tutorial-title">{{ tutorialSlides[tutorialSlideIndex].title }}</h2>
+              <p class="tutorial-desc">{{ tutorialSlides[tutorialSlideIndex].desc }}</p>
+            </div>
+          </div>
+
+          <div class="tutorial-footer">
+            <div class="tutorial-dots">
+              <span v-for="(_, index) in tutorialSlides" :key="index" 
+                    class="tutorial-dot" :class="{active: tutorialSlideIndex === index}"></span>
+            </div>
+            
+            <button v-if="tutorialSlideIndex < tutorialSlides.length - 1" 
+                    class="primary-btn" style="width: 100%; margin: 0;" @click="nextTutorialSlide">次へ</button>
+            <button v-else 
+                    class="primary-btn start-btn" style="width: 100%; margin: 0; background: var(--accent-gold); color: var(--primary-navy);" @click="completeTutorial">学習をはじめる</button>
           </div>
         </div>
       </div>
@@ -1332,7 +1516,7 @@
                   password: 'supabase_auth',
                   isPremium: false, chatCount: 0, lastChatDate: new Date().toDateString(),
                   displayName: (session.user.user_metadata?.name || session.user.email.split('@')[0]).slice(0, 12),
-                  modes: { shindanshi: { isFarmMember: false, isFirmOwner: false, myFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: [], activeBadge: '', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } }
+                  modes: { shindanshi: { isFarmMember: false, isFirmOwner: false, myFarmId: '', myPendingFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: [], activeBadge: '', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {} } }
                 };
                 localStorage.setItem('app_users', JSON.stringify(app_users));
               }
@@ -1452,9 +1636,10 @@
           }
         };
 
-        const isFarmMember = ref(true);
+        const isFarmMember = ref(false);
         const isFirmOwner = ref(false);
         const myFarmId = ref('');
+        const myPendingFarmId = ref('');
         const myFarmName = ref('');
         const totalExp = ref(0);
         
@@ -1714,7 +1899,7 @@
           if (!u.modes) {
             u.modes = {
               shindanshi: {
-                isFarmMember: u.isFarmMember !== undefined ? u.isFarmMember : true,
+                isFarmMember: u.isFarmMember !== undefined ? u.isFarmMember : false,
                 isFirmOwner: false,
                 totalExp: u.totalExp || 0,
                 dailyCorrect: u.dailyCorrect || 0,
@@ -1744,8 +1929,15 @@
           const m = u.modes[activeMode.value];
           isFarmMember.value = m.isFarmMember;
           isFirmOwner.value = m.isFirmOwner || false;
-          myFarmId.value = m.myFarmId || '';
-          totalExp.value = m.totalExp;
+                      myFarmId.value = m.myFarmId || '';
+            myPendingFarmId.value = m.myPendingFarmId || '';
+            
+            // 【修復ロジック】所属状態がTrueなのにファームIDが空の場合、強制修復を試みる
+            if (isFarmMember.value && !myFarmId.value) {
+              loadFarmMembers();
+            }
+            
+            totalExp.value = m.totalExp;
           
           const todayStr = new Date().toDateString();
           if (u.lastChatDate === todayStr) {
@@ -1824,13 +2016,10 @@
             } else if (pData) {
               isPremium.value = pData.is_premium || false;
               selfIntro.value = pData.bio || '';
-              if (pData.current_mode && !activeMode.value) {
-                activeMode.value = pData.current_mode;
-              }
             }
 
             // 2. 子テーブル（user_progress）の取得
-            const actualMode = activeMode.value || currentMode;
+            const actualMode = activeMode.value || (pData ? pData.current_mode : null) || currentMode;
             const { data: progData, error: progError } = await supa.from('user_progress').select('*').eq('user_id', userId).eq('profession_code', actualMode).single();
             
             if (progError && progError.code === 'PGRST116') {
@@ -1863,6 +2052,31 @@
                   app_users[userId].modes[actualMode].masteredBlocks = loadedMB;
                 }
               }
+            }
+
+            // 3. ファーム所属状態の同期
+            const { data: myMembership } = await supa
+              .from('farm_members')
+              .select('farm_id, role')
+              .eq('user_id', userId)
+              .neq('role', 'pending')
+              .limit(1)
+              .single();
+              
+            if (myMembership && myMembership.farm_id) {
+              isFarmMember.value = true;
+              myFarmId.value = myMembership.farm_id;
+              isFirmOwner.value = (myMembership.role === 'leader');
+              
+              if (app_users[userId] && app_users[userId].modes && app_users[userId].modes[actualMode]) {
+                app_users[userId].modes[actualMode].isFarmMember = true;
+                app_users[userId].modes[actualMode].myFarmId = myMembership.farm_id;
+                app_users[userId].modes[actualMode].isFirmOwner = isFirmOwner.value;
+              }
+            } else {
+              isFarmMember.value = false;
+              myFarmId.value = '';
+              isFirmOwner.value = false;
             }
           } catch (e) {
             console.error('Profile sync error:', e);
@@ -1973,7 +2187,7 @@
         }
 
         // Auto Save Watcher
-        watch([isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, dailyCorrect, dailyCombo, maxCombo, unlockedBadges, activeBadge, selfIntro, friendCount, chatCount, friendsList, directChats, requestedFriends, correctCounts, totalAnswered, consecutiveLogins, totalLogins, examParticipatedCount, likesSentCount, masteredBlocks], () => {
+        watch([isPremium, isFarmMember, isFirmOwner, myFarmId, myPendingFarmId, displayName, totalExp, dailyCorrect, dailyCombo, maxCombo, unlockedBadges, activeBadge, selfIntro, friendCount, chatCount, friendsList, directChats, requestedFriends, correctCounts, totalAnswered, consecutiveLogins, totalLogins, examParticipatedCount, likesSentCount, masteredBlocks], () => {
           if (!currentUser.value || !app_users[currentUser.value]) return;
           const u = app_users[currentUser.value];
           u.isPremium = isPremium.value;
@@ -1988,6 +2202,7 @@
             m.isFarmMember = isFarmMember.value;
             m.isFirmOwner = isFirmOwner.value;
             m.myFarmId = myFarmId.value;
+            m.myPendingFarmId = myPendingFarmId.value;
             m.totalExp = totalExp.value;
             m.dailyCorrect = dailyCorrect.value;
             m.dailyCombo = dailyCombo.value;
@@ -2069,6 +2284,56 @@
         // --- Google Play & Ads ---
         const showBenefitScreen = ref(false);
         
+        const isKeyboardVisible = ref(false);
+
+        // --- グローバルなキーボード開閉検知 ---
+        onMounted(() => {
+          if (window.Capacitor?.Plugins?.Keyboard) {
+            window.Capacitor.Plugins.Keyboard.addListener('keyboardWillShow', () => { isKeyboardVisible.value = true; });
+            window.Capacitor.Plugins.Keyboard.addListener('keyboardWillHide', () => { isKeyboardVisible.value = false; });
+          }
+          if (window.visualViewport) {
+            let maxVh = window.visualViewport.height;
+            window.visualViewport.addEventListener('resize', () => {
+              if (window.visualViewport.height > maxVh) {
+                maxVh = window.visualViewport.height;
+              }
+              isKeyboardVisible.value = window.visualViewport.height < maxVh * 0.85;
+            });
+          }
+        });
+
+        // isKeyboardVisibleの変更を監視し、広告の表示/非表示を自動同期
+        watch(isKeyboardVisible, async (visible) => {
+          try {
+            const { AdMob } = window.Capacitor?.Plugins || {};
+            if (!AdMob) return;
+            if (visible) {
+              await AdMob.hideBanner();
+            } else if (!isPremium.value && !showBenefitScreen.value) {
+              // 一度作成されたバナーを再表示する場合は resumeBanner を使用する
+              await AdMob.resumeBanner();
+            }
+          } catch (err) {
+            console.warn("AdMob Keyboard Sync Error:", err);
+          }
+        });
+
+        // --- HTML入力欄のフォーカス連動用（上記グローバル検知の補助） ---
+        const handleInputFocus = () => {
+          isKeyboardVisible.value = true;
+        };
+
+        const handleInputBlur = () => {
+          // Blur発火後、キーボードが閉じきった頃にフラグをfalseに戻すフォールバック
+          setTimeout(() => {
+            // Capacitor Keyboardプラグインがあればそちらに任せるので何もしない
+            if (!window.Capacitor?.Plugins?.Keyboard) {
+               isKeyboardVisible.value = false;
+            }
+          }, 300);
+        };
+
         // --- 💡 AdMobバナー制御：プレミアム画面の開閉と連動 ---
         watch(showBenefitScreen, async (isOpened) => {
           try {
@@ -2094,6 +2359,8 @@
             console.warn("AdMob Banner Toggle Error:", err);
           }
         });
+
+
         const showGPlayModal = ref(false);
         const isProcessingPayment = ref(false);
 
@@ -2310,7 +2577,7 @@
                 displayName: displayName.value.slice(0, 12),
                 modes: {
                   shindanshi: {
-                    isFarmMember: false, isFirmOwner: false, myFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: [], activeBadge: '', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {}
+                    isFarmMember: false, isFirmOwner: false, myFarmId: '', myPendingFarmId: '', totalExp: 0, dailyCorrect: 0, dailyCombo: 0, maxCombo: 0, unlockedBadges: [], activeBadge: '', selfIntro: '', friendCount: 5, friendsList: [], directChats: {}, requestedFriends: [], correctCounts: {}
                   }
                 }
               };
@@ -2340,8 +2607,14 @@
           } finally {
             // 完全初期化
             currentUser.value = null;
-            displayName.value = 'ユーザー';
+            activeMode.value = null;
+            isFarmMember.value = false;
+            isFirmOwner.value = false;
+            firmMembers.value = [];
+            firmPendingMembers.value = [];
+            displayName.value = 'ゲスト';
             myFarmId.value = '';
+            myPendingFarmId.value = '';
             totalExp.value = 0;
             currentLevel.value = 1;
             unlockedBadges.value = [];
@@ -2361,8 +2634,58 @@
           }
         };
 
+        // --- Tutorial Carousel ---
+        const showTutorial = ref(false);
+        const tutorialSlideIndex = ref(0);
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        const tutorialSlides = [
+          { icon: '🎯', title: '全問3回正解を目指そう！', desc: 'このアプリの目的は、うろ覚えを確実な知識に変えることです。同じ問題を3回正解して「マスター状態」にし、すべての問題をコンプリートしましょう！' },
+          { icon: '🏫', title: '気分で選べる2つの自習室', desc: 'もくもくと集中して問題を解きたい時は「サイレント自習室」を、他のユーザーとチャットで教え合いながら解きたい時は「チャット推奨自習室」を選んで学習できます。' },
+          { icon: '🤝', title: 'フレンドを作ろう', desc: '自習室のトーク画面で気になる相手の名前をタップすると、直接フレンド申請ができます。また、ユーザー名での検索によるフレンド追加も可能です。' },
+          { icon: '🏢', title: 'ファームを結成しよう', desc: '最大10人のメンバーで1つのチーム「ファーム」を結成できます。専用のファームチャットを使って、仲間とモチベーションを高め合いながら合格を目指しましょう！' },
+          { icon: '🏆', title: '毎日21時は一斉模試！', desc: '毎日21時に、全ユーザー参加の「一斉模試」が開催されます。日々の学習の成果を発揮して、全問正解（満点）のトップエリートを目指しましょう！' }
+        ];
+
+        const completeTutorial = () => {
+          localStorage.setItem('is_tutorial_completed', 'true');
+          showTutorial.value = false;
+        };
+
+        const nextTutorialSlide = () => {
+          if (tutorialSlideIndex.value < tutorialSlides.length - 1) {
+            tutorialSlideIndex.value++;
+          }
+        };
+
+        const handleTouchStart = (e) => {
+          touchStartX = e.changedTouches[0].screenX;
+        };
+
+        const handleTouchEnd = (e) => {
+          touchEndX = e.changedTouches[0].screenX;
+          const swipeDistance = touchStartX - touchEndX;
+          const minSwipeDistance = 50;
+
+          if (swipeDistance > minSwipeDistance) {
+            if (tutorialSlideIndex.value < tutorialSlides.length - 1) tutorialSlideIndex.value++;
+          } else if (swipeDistance < -minSwipeDistance) {
+            if (tutorialSlideIndex.value > 0) tutorialSlideIndex.value--;
+          }
+        };
+
         // --- Navigation ---
         const activeTab = ref('home'); 
+        
+        watch([activeTab, authScreen], () => {
+          if (authScreen.value === 'app' && activeTab.value === 'home') {
+            const isCompleted = localStorage.getItem('is_tutorial_completed');
+            if (isCompleted !== 'true') {
+              showTutorial.value = true;
+            }
+          }
+        }, { immediate: true });
         const studyRoute = ref('rooms'); 
         const profileTab = ref('me');
 
@@ -2929,7 +3252,10 @@
                   });
                 }
               }
-              searchedUsers.value = data;
+              searchedUsers.value = data.map(u => {
+                const titleIdx = Math.floor(((u.level || 1) - 1) / 5);
+                return { ...u, title: TITLES[Math.min(titleIdx, 19)] || '新人' };
+              });
             }
           } catch (e) {
             console.error('ユーザー検索エラー:', e);
@@ -2995,7 +3321,7 @@
                   name: friendProfile.user_name || '不明なユーザー',
                   icon: '👤',
                   level: friendProfile.level || 1,
-                  title: friendProfile.title || 'アソシエイト',
+                  title: TITLES[Math.min(Math.floor(((friendProfile.level || 1) - 1) / 5), 19)] || '新人',
                   unlocked_badges: friendProfile.unlocked_badges || []
                 };
               }).filter(Boolean); // nullの要素を安全に除外
@@ -3040,7 +3366,7 @@
                   sender_profile: profile || { 
                     user_name: profile?.user_name || '不明なユーザー',
                     level: profile?.level || 1,
-                    title: profile?.title || 'アソシエイト',
+                    title: TITLES[Math.min(Math.floor(((profile?.level || 1) - 1) / 5), 19)] || '新人',
                     unlocked_badges: profile?.unlocked_badges || []
                   } 
                 };
@@ -3118,7 +3444,6 @@
                  time: timeStr
                });
                
-               // チャット画面を開いている場合は自動スクロール
                if (activeFriend.value && activeFriend.value.id === fid && friendRoute.value === 'chat') {
                  setTimeout(() => {
                    const el = document.getElementById('directChatArea');
@@ -3279,7 +3604,7 @@
             // 2. 自分を設立者(leader)として登録
             const { error: memberError } = await supa
               .from('farm_members')
-              .insert([{ farm_id: newFarm.id, user_id: currentUser.value, role: 'leader' }]);
+              .insert([{ farm_id: newFarm.id, user_id: currentUser.value, role: 'leader', status: 'approved' }]);
 
             if (memberError) {
               console.error('ファームメンバー登録エラー:', memberError);
@@ -3458,6 +3783,7 @@
         };
 
         const firmMembers = ref([]);
+        const firmPendingMembers = ref([]);
 
         const loadFarmMembers = async () => {
           try {
@@ -3476,8 +3802,9 @@
 
               const { data: myMembership } = await supa
                 .from('farm_members')
-                .select('farm_id')
+                .select('farm_id, role')
                 .eq('user_id', realUserId)
+                .neq('role', 'pending')
                 .limit(1)
                 .single();
               
@@ -3496,7 +3823,13 @@
 
             if (!targetFarmId) {
               console.warn("逆引きでもファームが見つかりませんでした。");
+              isFarmMember.value = false;
+              isFirmOwner.value = false;
+              myFarmId.value = '';
+              myFarmName.value = '';
+              firmJoinRoute.value = 'lobby';
               firmMembers.value = [];
+              firmPendingMembers.value = [];
               return;
             }
 
@@ -3508,7 +3841,20 @@
 
             if (mError || !members || members.length === 0) {
               firmMembers.value = [];
+              firmPendingMembers.value = [];
               return;
+            }
+
+            // ファーム名の復元（再起動時対策）
+            if (!myFarmName.value) {
+              const { data: farmData } = await supa
+                .from('farms')
+                .select('name')
+                .eq('id', targetFarmId)
+                .single();
+              if (farmData && farmData.name) {
+                myFarmName.value = farmData.name;
+              }
             }
 
             // 2. 取得したuser_idの配列を作成
@@ -3517,7 +3863,7 @@
             // 3. 結合を使わず、user_profilesからプロフィールをダイレクトに一括取得
             const { data: profiles, error: pError } = await supa
               .from('user_profiles')
-              .select('id, user_name, level, active_badge, intro')
+              .select('id, user_name, level, active_badge, bio')
               .in('id', userIds);
 
             if (pError || !profiles) {
@@ -3526,7 +3872,7 @@
             }
 
             // 4. 画面への動的描画（Vueの配列に流し込むことでinnerHTMLと同様の描画を行います）
-            firmMembers.value = members.map(member => {
+            const mappedMembers = members.map(member => {
               const prof = profiles.find(p => p.id === member.user_id);
               const name = prof ? prof.user_name : "アソシエイト（同期中）";
               const level = prof ? prof.level : 1;
@@ -3541,10 +3887,12 @@
                 level: level,
                 title: TITLES[Math.min(titleIdx, 19)] || '新人',
                 badge: badge,
-                intro: (prof && prof.intro) ? prof.intro : 'よろしくお願いします！'
+                intro: (prof && prof.bio) ? prof.bio : 'よろしくお願いします！'
               };
             });
-            console.log('結合完了後のメンバー配列:', firmMembers.value);
+              firmMembers.value = mappedMembers.filter(m => m.role !== 'pending');
+              firmPendingMembers.value = mappedMembers.filter(m => m.role === 'pending');
+              console.log('結合完了後のメンバー配列:', firmMembers.value);
             
           } catch (e) {
             console.error('例外エラー:', e);
@@ -3614,6 +3962,23 @@
 
         const firmRoute = ref('chat');
         const showMemberProfileModal = ref(false);
+
+        watch(showMemberProfileModal, async (isOpened) => {
+          try {
+            const { AdMob } = window.Capacitor?.Plugins || {};
+            if (!AdMob) return;
+            
+            if (isOpened) {
+              await AdMob.hideBanner();
+            } else {
+              if (!isPremium.value && !showBenefitScreen.value) {
+                await AdMob.resumeBanner();
+              }
+            }
+          } catch (err) {
+            console.warn("AdMob Banner Toggle Error (Profile Modal):", err);
+          }
+        });
         const activeFirmMember = ref(null);
 
         const openMemberProfile = (m) => {
@@ -3725,20 +4090,73 @@
         };
 
         const leaveFirm = async () => {
-          if (!myFarmId.value) return;
+          let targetFarmId = myFarmId.value;
+
+          // Vueのステート構造変更等によりローカルのmyFarmIdが欠落している場合のフェールセーフ
+          if (!targetFarmId) {
+            if (isFarmMember.value) {
+              console.warn("ローカルのファームIDが空ですが、UIが所属状態になっています。DBからIDを再取得して脱退を試みます。");
+              const authRes = await supa.auth.getUser();
+              const realUserId = authRes.data.user?.id || currentUser.value;
+              const { data: myMembership } = await supa
+                .from('farm_members')
+                .select('farm_id, role')
+                .eq('user_id', realUserId)
+                .neq('role', 'pending')
+                .limit(1)
+                .single();
+              
+              if (myMembership && myMembership.farm_id) {
+                targetFarmId = myMembership.farm_id;
+                myFarmId.value = targetFarmId;
+              } else {
+                // DBにも所属情報が存在しない異常状態の場合は、強制的にローカルをリセットしてロビーへ戻す
+                isFarmMember.value = false;
+                isFirmOwner.value = false;
+                firmJoinRoute.value = 'lobby';
+                return;
+              }
+            } else {
+              return;
+            }
+          }
 
           const confirmLeave = confirm("本当にこのファームを脱退しますか？");
           if (!confirmLeave) return;
 
           try {
-            const targetFarmId = myFarmId.value;
+            // 自動リーダー委譲ロジック（リーダーが脱退する場合）
+            if (isFirmOwner.value) {
+              const { data: otherMembers } = await supa
+                .from('farm_members')
+                .select('user_id')
+                .eq('farm_id', targetFarmId)
+                .neq('role', 'pending')
+                .neq('user_id', currentUser.value);
+              
+              if (otherMembers && otherMembers.length > 0) {
+                const userIds = otherMembers.map(m => m.user_id);
+                // 経験値(total_exp)が最も高いユーザーを探す
+                const { data: bestProfiles } = await supa
+                  .from('user_profiles')
+                  .select('id')
+                  .in('id', userIds)
+                  .order('total_exp', { ascending: false })
+                  .limit(1);
+                  
+                if (bestProfiles && bestProfiles.length > 0) {
+                  const newLeaderId = bestProfiles[0].id;
+                  await supa.from('farm_members').update({ role: 'leader' }).eq('farm_id', targetFarmId).eq('user_id', newLeaderId);
+                  console.log("新リーダーへ権限を委譲しました:", newLeaderId);
+                }
+              }
+            }
 
-            // 1. 【お掃除ロジック】既存のファームIDが本物のUUID形式か判定する
-            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-            const isValidUUID = uuidRegex.test(targetFarmId);
+            // 1. 【お掃除ロジック】ダミーID（"f_"始まり等の古い仕様）か判定する
+            const isDummyID = String(targetFarmId).startsWith("f_");
 
-            // 2. ダミーID（"f_123"等）の場合、通信を絶対に実行せずスタンドアロンで状態を初期化
-            if (!isValidUUID) {
+            // 2. ダミーIDの場合、通信を絶対に実行せずスタンドアロンで状態を初期化
+            if (isDummyID) {
               console.log("レガシーなダミーファームIDを検出しました。Supabase通信をスキップして状態を初期化します。");
               
               // 変数と状態のリセットだけでUIを初期画面（ロビー）へ戻す
@@ -3849,42 +4267,98 @@
 
 
 
+        
+        const approveFirmMember = async (m) => {
+          if (!myFarmId.value || !m || !m.id) return;
+          try {
+            const { error } = await supa
+              .from('farm_members')
+              .update({ role: 'member', status: 'approved' })
+              .eq('farm_id', myFarmId.value)
+              .eq('user_id', m.id);
+            if (error) throw error;
+            
+            alert(m.name + 'さんの加入を承認しました！');
+            
+            // システムメッセージ
+            await supa.from('messages').insert([{
+              room_id: 'farm_room_' + myFarmId.value,
+              user_id: currentUser.value,
+              user_name: 'システム',
+              avatar_badge: '🔰',
+              content: '🙌 ' + m.name + 'さんがファームに加入しました！よろしく！'
+            }]);
+            
+            await loadFarmMembers();
+          } catch(e) {
+            console.error('承認エラー:', e);
+            alert('承認に失敗しました。');
+          }
+        };
+
+        const appointFirmLeader = async (m) => {
+            if (!confirm(`本当に ${m.name} を新リーダーに任命しますか？\n（あなたは一般メンバーになります）`)) return;
+            try {
+              // 自分をメンバーに
+              await supa.from('farm_members').update({ role: 'member' }).eq('farm_id', m.farmId).eq('user_id', currentUser.value);
+              // 相手をリーダーに
+              await supa.from('farm_members').update({ role: 'leader' }).eq('farm_id', m.farmId).eq('user_id', m.id);
+              
+              alert(`${m.name} を新リーダーに任命しました。`);
+              isFirmOwner.value = false;
+              await loadFarmMembers();
+            } catch(e) {
+              console.error('リーダー任命エラー:', e);
+            }
+          };
+
+          const kickFirmMember = async (m) => {
+            if (!confirm(`本当に ${m.name} をキックしますか？`)) return;
+            try {
+              await supa.from('farm_members').delete().eq('farm_id', m.farmId).eq('user_id', m.id);
+              alert('キックしました');
+              await loadFarmMembers();
+            } catch(e) {
+              console.error('キックエラー:', e);
+            }
+          };
+
+          const rejectFirmMember = async (m) => {
+          if (!myFarmId.value || !m || !m.id) return;
+          if (!confirm(m.name + 'さんの加入申請を拒否しますか？')) return;
+          try {
+            const { error } = await supa
+              .from('farm_members')
+              .delete()
+              .eq('farm_id', myFarmId.value)
+              .eq('user_id', m.id);
+            if (error) throw error;
+            
+            alert(m.name + 'さんの申請を拒否しました。');
+            await loadFarmMembers();
+          } catch(e) {
+            console.error('拒否エラー:', e);
+            alert('処理に失敗しました。');
+          }
+        };
+
         const joinFirm = async (f) => {
           if (!f || !f.id) return;
           try {
-            // 過去のデータが残っていても上書きできるようにupsertを使用
+            // upsertだとRLSのUPDATEポリシーに引っかかるため、insertを使用します。
             const { error: memberError } = await supa
               .from('farm_members')
-              .upsert(
-                [{ farm_id: f.id, user_id: currentUser.value, role: 'member' }],
-                { onConflict: 'farm_id,user_id' }
-              );
+              .insert([{ farm_id: f.id, user_id: currentUser.value, role: 'pending', status: 'pending' }]);
 
-            if (memberError) {
-              console.error('ファーム加入エラー:', memberError);
-              alert('加入処理に失敗しました。');
+            if (memberError && memberError.code !== '23505') { // 23505 is unique violation
+              console.error('ファーム加入申請エラー:', memberError);
+              alert('加入申請に失敗しました。');
               return;
             }
 
-            // ローカルステートを更新
-            myFarmId.value = f.id;
-            myFarmName.value = f.name;
-            isFarmMember.value = true;
-            isFirmOwner.value = false;
-            firmRoute.value = 'chat';
+            myPendingFarmId.value = f.id;
+            alert('加入申請を送信しました。管理者の承認をお待ちください。');
             
-            checkAndUnlockBadge('badge_farm_02');
-            
-            // システムメッセージをDBに送信
-            await supa.from('messages').insert([{
-              room_id: 'farm_room_' + f.id,
-              user_id: currentUser.value,
-              user_name: 'システム',
-              avatar_badge: '🔧',
-              content: `🏢 「${f.name}」に加入しました！まずは挨拶してみましょう。`
-            }]);
-
-            alert(`「${f.name}」に加入しました！`);
           } catch (e) {
             console.error(e);
             alert('加入処理中にエラーが発生しました。');
@@ -4120,6 +4594,8 @@
         });
 
         return {
+          showTutorial, tutorialSlideIndex, tutorialSlides, completeTutorial, nextTutorialSlide, handleTouchStart, handleTouchEnd,
+          handleInputFocus, handleInputBlur, isKeyboardVisible,
           ShigyoIAP,
           authScreen, currentUser, loginUsername, loginPassword, loginError, doLogin, doRegister, switchAuthMode, activeMode, selectMode,
           regUsername, regPassword, regIntro, regError, doLogout,
@@ -4151,7 +4627,7 @@
           examCountdownString, isExamLive, forceStartRealMockExam, isMockDebugMode,
           examQueue, examCurrentIndex, examCurrentQuestion, currentExamSubjectName, isExamFinished, examTimeLeft, examTotalTime, formattedExamTime, handleExamAnswer, examCorrectCount, returnToFirmFromExam,
 
-          firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, openFarmMembers,
+          firmPendingMembers, firmRoute, firmMembers, showMemberProfileModal, activeFirmMember, requestedFriends, openMemberProfile, openMemberProfileFromChat, isAlreadyFriend, sendFriendRequest, openFarmMembers, approveFirmMember, rejectFirmMember, kickFirmMember, appointFirmLeader,
           firmJoinRoute, firmSearchQuery, newFirmName, newFirmIntro, farmsList, joinFirm, createFirm, leaveFirm, myFarmName,
           friendRoute, friendSearch, filteredFriends, friendsList, directChats, activeFriend, directChatInput, removeFriend, openDirectChat, sendDirectChat, pendingRequests, loadPendingRequests, acceptFriendRequest,
           showBadgeModal, ALL_BADGES, equipBadge
@@ -4163,3 +4639,4 @@
   </script>
 </body>
 </html>
+
