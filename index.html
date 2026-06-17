@@ -3665,6 +3665,10 @@
               };
             }
             showMemberProfileModal.value = true;
+              // リアルタイム通信の漏れやスリープ復帰時のズレを直すため、プロフィールを開くたびにフレンド状態を同期
+              loadPendingRequests();
+              loadFriendsList();
+              syncRequestedFriends();
           } catch(e) {
             console.error('プロフィール取得エラー:', e);
           }
@@ -3984,6 +3988,12 @@
         const openMemberProfile = (m) => {
           activeFirmMember.value = m;
           showMemberProfileModal.value = true;
+            loadPendingRequests();
+            loadFriendsList();
+            syncRequestedFriends();
+            loadPendingRequests();
+            loadFriendsList();
+            syncRequestedFriends();
         };
 
         const openMemberProfileFromChat = async (userId) => {
