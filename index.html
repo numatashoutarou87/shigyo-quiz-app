@@ -301,9 +301,9 @@
     @keyframes toast-slide { 0% { top: 0px; opacity: 0; } 10% { top: 80px; opacity: 1; } 90% { top: 80px; opacity: 1; } 100% { top: 0px; opacity: 0; } }
 
     /* Ads & Google Play */
-    .ad-banner { position: absolute; bottom: 60px; width: 100%; height: 50px; background: #E0E0E0; color: #888; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; border-top: 1px solid #ccc; z-index: 40; }
-    .app-container.has-ad .screen { margin-bottom: 110px !important; }
-    .app-container.has-ad .quiz-screen { margin-bottom: 0 !important; padding-bottom: 110px !important; }
+    
+    
+    
     .interstitial-ad { position: absolute; inset: 0; background: rgba(0,0,0,0.95); z-index: 500; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; }
     .interstitial-ad-content { background: #333; color: #fff; width: 90%; height: 60%; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 12px; font-size: 20px; font-weight: bold; border: 2px solid #555; }
     .ad-close-header { position: absolute; top: 20px; right: 20px; color: white; display: flex; align-items: center; gap: 10px; font-size: 13px; }
@@ -462,7 +462,7 @@
   </style>
 </head>
 <body>
-  <div id="app" class="app-container" :class="{'has-ad': !isPremium && activeTab !== 'home' && activeTab !== 'profile' && !isKeyboardVisible}" v-cloak>
+  <div id="app" class="app-container"  v-cloak>
 
 
     
@@ -1294,10 +1294,6 @@
           </div>
         </transition>
 
-        <!-- Bottom Ad Banner -->
-        <div v-if="!isPremium && activeTab !== 'home' && activeTab !== 'profile' && !isKeyboardVisible" class="ad-banner">
-          [AD] ここにスポンサー広告が表示されます
-        </div>
 
         <!-- Bottom Navigation -->
         <nav class="bottom-nav" v-if="!(activeTab === 'study' && studyRoute === 'quiz') && activeTab !== 'exam'">
@@ -1456,16 +1452,6 @@
         }
 
         onMounted(async () => {
-          // --- AdMobバナー広告の初期化と表示 ---
-          try {
-            const { AdMob } = window.Capacitor.Plugins;
-            await AdMob.initialize({ requestTrackingAuthorization: true });
-              admobInitialized.value = true;
-            
-            } catch (err) {
-            console.warn("AdMobは未対応の環境です");
-          }
-
           // 次回起動時のためのユーザー名・パスワード自動補完
           const savedUsername = localStorage.getItem('remembered_username');
           const savedPassword = localStorage.getItem('remembered_password');
@@ -1490,42 +1476,7 @@
           }
           
           
-          // --- Unified AdMob Visibility Control ---
-          const admobInitialized = ref(false);
-          const shouldShowAd = computed(() => {
-            return admobInitialized.value && !isPremium.value && 
-                   activeTab.value !== 'home' && 
-                   activeTab.value !== 'profile' && 
-                   !isKeyboardVisible.value && 
-                   !showBenefitScreen.value && 
-                   !showMemberProfileModal.value;
-          });
-
-          watch(shouldShowAd, async (show) => {
-            try {
-              const { AdMob } = window.Capacitor?.Plugins || {};
-              if (!AdMob || !admobInitialized.value) return;
-              if (show) {
-                try {
-                  await AdMob.resumeBanner();
-                } catch (e) {
-                  await AdMob.showBanner({
-                    adId: 'ca-app-pub-3940256099942544/6300978111',
-                    position: 'BOTTOM_CENTER',
-                    size: 'BANNER',
-                    margin: 50,
-                    isTesting: true
-                  });
-                }
-              } else {
-                await AdMob.hideBanner();
-              }
-            } catch (err) {
-              console.warn("AdMob Toggle Error:", err);
-            }
-          }, { immediate: true });
-          
-const checkSession = async () => {
+          const checkSession = async () => {
             const { data: { session } } = await supa.auth.getSession();
             
             if (session && session.user) {
@@ -1686,6 +1637,7 @@ const checkSession = async () => {
         const consecutiveLogins = ref(0);
         const totalLogins = ref(0);
         const examParticipatedCount = ref(0);
+        const lastExamDate = ref('');
         const likesSentCount = ref(0);
 
         const friendsList = ref([]);
@@ -1981,6 +1933,7 @@ const checkSession = async () => {
           
           totalAnswered.value = m.totalAnswered || 0;
           examParticipatedCount.value = m.examParticipatedCount || 0;
+          lastExamDate.value = m.lastExamDate || '';
           likesSentCount.value = m.likesSentCount || 0;
           
           // ログイン日数の計算とバッジ判定
@@ -2227,7 +2180,7 @@ const checkSession = async () => {
         }
 
         // Auto Save Watcher
-        watch([isPremium, isFarmMember, isFirmOwner, myFarmId, myPendingFarmId, displayName, totalExp, dailyCorrect, dailyCombo, maxCombo, unlockedBadges, activeBadge, selfIntro, friendCount, chatCount, friendsList, directChats, requestedFriends, correctCounts, totalAnswered, consecutiveLogins, totalLogins, examParticipatedCount, likesSentCount, masteredBlocks], () => {
+        watch([isPremium, isFarmMember, isFirmOwner, myFarmId, myPendingFarmId, displayName, totalExp, dailyCorrect, dailyCombo, maxCombo, unlockedBadges, activeBadge, selfIntro, friendCount, chatCount, friendsList, directChats, requestedFriends, correctCounts, totalAnswered, consecutiveLogins, totalLogins, examParticipatedCount, lastExamDate, likesSentCount, masteredBlocks], () => {
           if (!currentUser.value || !app_users[currentUser.value]) return;
           const u = app_users[currentUser.value];
           u.isPremium = isPremium.value;
@@ -2255,6 +2208,7 @@ const checkSession = async () => {
             m.consecutiveLogins = consecutiveLogins.value;
             m.totalLogins = totalLogins.value;
             m.examParticipatedCount = examParticipatedCount.value;
+            m.lastExamDate = lastExamDate.value;
             m.likesSentCount = likesSentCount.value;
             m.friendsList = JSON.parse(JSON.stringify(friendsList.value));
             m.directChats = JSON.parse(JSON.stringify(directChats.value));
@@ -2360,10 +2314,6 @@ const checkSession = async () => {
             }
           }, 300);
         };
-
-        // --- 💡 AdMobバナー制御：プレミアム画面の開閉と連動 ---
-        
-
 
         const showGPlayModal = ref(false);
         const isProcessingPayment = ref(false);
@@ -2900,6 +2850,12 @@ const checkSession = async () => {
          */
         const forceStartRealMockExam = async (isDebug = false) => {
           console.log("本物の100問模試を開始します。ダミーを排除中...");
+          
+          if (!isDebug && lastExamDate.value === new Date().toDateString()) {
+            alert("本日の「一斉模試」はすでに受験済みです。また明日挑戦してください！");
+            return;
+          }
+          
           isMockDebugMode.value = isDebug; // フラグをセット
           
           if (isExamLoading.value) return;
@@ -2922,7 +2878,7 @@ const checkSession = async () => {
             isExamFinished.value = false;
 
             // ─── ステップ3: 100問が確定した状態で、初めて本番のタイマーとUIを起動する ───
-            const durationSeconds = 3600; // 60分
+            const durationSeconds = 600; // 10分
             examTotalTime.value = durationSeconds;
             examTimeLeft.value = durationSeconds;
             
@@ -2971,6 +2927,7 @@ const checkSession = async () => {
           isMockDebugMode.value = false; // デバッグモードを安全にリセット
           addExp(examCorrectCount.value * 10);
           
+          lastExamDate.value = new Date().toDateString();
           examParticipatedCount.value++;
           checkAndUnlockBadge('badge_exam_01');
           if (examParticipatedCount.value >= 30) checkAndUnlockBadge('badge_exam_02');
@@ -4683,4 +4640,3 @@ const checkSession = async () => {
   </script>
 </body>
 </html>
-
