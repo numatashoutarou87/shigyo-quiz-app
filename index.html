@@ -3955,9 +3955,18 @@ const checkSession = async () => {
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'farm_members' }, payload => {
               if (payload.new?.farm_id === myFarmId.value) loadFarmMembers();
             })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'farm_members' }, payload => {
-              if (payload.new?.farm_id === myFarmId.value) loadFarmMembers();
-            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'farm_members' }, async (payload) => {
+                const myId = currentUser.value;
+                if (payload.new?.user_id === myId && payload.new?.status === 'approved' && !isFarmMember.value) {
+                  alert("ファームへの加入が承認されました！");
+                  isFarmMember.value = true;
+                  myFarmId.value = payload.new.farm_id;
+                  isFirmOwner.value = (payload.new.role === 'leader');
+                  firmRoute.value = 'chat';
+                  saveUserProfile();
+                }
+                if (payload.new?.farm_id === myFarmId.value) loadFarmMembers();
+              })
             .subscribe();
         };
         initFarmMembersSubscription();
