@@ -2087,22 +2087,32 @@ const checkSession = async () => {
 
             // 3. ファーム所属状態の同期
             const { data: myMembership } = await supa
-              .from('farm_members')
-              .select('farm_id, role')
-              .eq('user_id', userId)
-              .neq('role', 'pending')
-              .limit(1)
-              .single();
-              
-            if (myMembership && myMembership.farm_id) {
-              isFarmMember.value = true;
-              myFarmId.value = myMembership.farm_id;
-              isFirmOwner.value = (myMembership.role === 'leader');
-              
-              if (app_users[userId] && app_users[userId].modes && app_users[userId].modes[actualMode]) {
-                app_users[userId].modes[actualMode].isFarmMember = true;
-                app_users[userId].modes[actualMode].myFarmId = myMembership.farm_id;
-                app_users[userId].modes[actualMode].isFirmOwner = isFirmOwner.value;
+                .from('farm_members')
+                .select('farm_id, role')
+                .eq('user_id', userId)
+                .limit(1)
+                .single();
+                
+              if (myMembership && myMembership.farm_id) {
+                if (myMembership.role === 'pending') {
+                  myPendingFarmId.value = myMembership.farm_id;
+                  isFarmMember.value = false;
+                  isFirmOwner.value = false;
+                  
+                  if (app_users[userId] && app_users[userId].modes && app_users[userId].modes[actualMode]) {
+                    app_users[userId].modes[actualMode].myPendingFarmId = myMembership.farm_id;
+                  }
+                } else {
+                  isFarmMember.value = true;
+                  myFarmId.value = myMembership.farm_id;
+                  isFirmOwner.value = (myMembership.role === 'leader');
+                  
+                  if (app_users[userId] && app_users[userId].modes && app_users[userId].modes[actualMode]) {
+                    app_users[userId].modes[actualMode].isFarmMember = true;
+                    app_users[userId].modes[actualMode].myFarmId = myMembership.farm_id;
+                    app_users[userId].modes[actualMode].isFirmOwner = isFirmOwner.value;
+                  }
+                }
               }
             } else {
               isFarmMember.value = false;
