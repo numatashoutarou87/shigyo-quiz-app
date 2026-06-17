@@ -3285,10 +3285,10 @@
                 sender_id,
                 receiver_id,
                 sender:user_profiles!friendships_sender_id_fkey (
-                  id, user_name, level, active_badge, unlocked_badges, title
+                  id, user_name, level, active_badge, unlocked_badges
                 ),
                 receiver:user_profiles!friendships_receiver_id_fkey (
-                  id, user_name, level, active_badge, unlocked_badges, title
+                  id, user_name, level, active_badge, unlocked_badges
                 )
               `)
               .eq('status', 'accepted')
@@ -3346,7 +3346,7 @@
               .select(`
                 *,
                 sender_profile:user_profiles!friendships_sender_id_fkey (
-                  id, user_name, level, active_badge, unlocked_badges, title
+                  id, user_name, level, active_badge, unlocked_badges
                 )
               `)
               .eq('receiver_id', myId)
@@ -3649,7 +3649,7 @@
                 id: data.id,
                 name: data.user_name,
                 level: data.level || 1,
-                title: data.title || 'アソシエイト',
+                title: TITLES[Math.min(Math.floor(((data.level || 1) - 1) / 5), 19)] || '新人',
                 badge: data.badge || '🔰',
                 intro: data.bio || 'よろしくお願いします。'
               };
@@ -3659,7 +3659,7 @@
                 id: u.id,
                 name: u.name,
                 level: 1,
-                title: 'アソシエイト',
+                title: TITLES[0],
                 badge: '🔰',
                 intro: 'プロフィールが未設定です。'
               };
