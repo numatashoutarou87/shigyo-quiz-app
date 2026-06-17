@@ -301,7 +301,9 @@
     @keyframes toast-slide { 0% { top: 0px; opacity: 0; } 10% { top: 80px; opacity: 1; } 90% { top: 80px; opacity: 1; } 100% { top: 0px; opacity: 0; } }
 
     /* Ads & Google Play */
-    .ad-banner { height: 50px; background: #E0E0E0; color: #888; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; border-top: 1px solid #ccc; z-index: 40; }
+    .ad-banner { position: absolute; bottom: 60px; width: 100%; height: 50px; background: #E0E0E0; color: #888; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; border-top: 1px solid #ccc; z-index: 40; }
+    .app-container.has-ad .screen { margin-bottom: 110px !important; }
+    .app-container.has-ad .quiz-screen { margin-bottom: 0 !important; padding-bottom: 110px !important; }
     .interstitial-ad { position: absolute; inset: 0; background: rgba(0,0,0,0.95); z-index: 500; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; }
     .interstitial-ad-content { background: #333; color: #fff; width: 90%; height: 60%; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 12px; font-size: 20px; font-weight: bold; border: 2px solid #555; }
     .ad-close-header { position: absolute; top: 20px; right: 20px; color: white; display: flex; align-items: center; gap: 10px; font-size: 13px; }
@@ -460,7 +462,7 @@
   </style>
 </head>
 <body>
-  <div id="app" class="app-container" v-cloak>
+  <div id="app" class="app-container" :class="{'has-ad': !isPremium && activeTab !== 'home' && !isKeyboardVisible}" v-cloak>
 
 
     
@@ -1293,7 +1295,7 @@
         </transition>
 
         <!-- Bottom Ad Banner -->
-        <div v-if="!isPremium && !isKeyboardVisible" class="ad-banner">
+        <div v-if="!isPremium && activeTab !== 'home' && !isKeyboardVisible" class="ad-banner">
           [AD] ここにスポンサー広告が表示されます
         </div>
 
@@ -1458,18 +1460,9 @@
           try {
             const { AdMob } = window.Capacitor.Plugins;
             await AdMob.initialize({ requestTrackingAuthorization: true });
+              admobInitialized.value = true;
             
-            const showBannerAction = async () => {
-              await AdMob.showBanner({
-                adId: 'ca-app-pub-3940256099942544/6300978111',
-                position: 'BOTTOM_CENTER',
-                size: 'BANNER',
-                margin: 50,
-                isTesting: true
-              });
-            };
-            await showBannerAction();
-          } catch (err) {
+            } catch (err) {
             console.warn("AdMobは未対応の環境です");
           }
 
@@ -1496,7 +1489,42 @@
             localStorage.removeItem('currentUser');
           }
           
-          const checkSession = async () => {
+          
+          // --- Unified AdMob Visibility Control ---
+          const admobInitialized = ref(false);
+          const shouldShowAd = computed(() => {
+            return admobInitialized.value && !isPremium.value && 
+                   activeTab.value !== 'home' && 
+                   !isKeyboardVisible.value && 
+                   !showBenefitScreen.value && 
+                   !showMemberProfileModal.value;
+          });
+
+          watch(shouldShowAd, async (show) => {
+            try {
+              const { AdMob } = window.Capacitor?.Plugins || {};
+              if (!AdMob || !admobInitialized.value) return;
+              if (show) {
+                try {
+                  await AdMob.resumeBanner();
+                } catch (e) {
+                  await AdMob.showBanner({
+                    adId: 'ca-app-pub-3940256099942544/6300978111',
+                    position: 'BOTTOM_CENTER',
+                    size: 'BANNER',
+                    margin: 50,
+                    isTesting: true
+                  });
+                }
+              } else {
+                await AdMob.hideBanner();
+              }
+            } catch (err) {
+              console.warn("AdMob Toggle Error:", err);
+            }
+          }, { immediate: true });
+          
+const checkSession = async () => {
             const { data: { session } } = await supa.auth.getSession();
             
             if (session && session.user) {
@@ -2304,20 +2332,7 @@
         });
 
         // isKeyboardVisibleの変更を監視し、広告の表示/非表示を自動同期
-        watch(isKeyboardVisible, async (visible) => {
-          try {
-            const { AdMob } = window.Capacitor?.Plugins || {};
-            if (!AdMob) return;
-            if (visible) {
-              await AdMob.hideBanner();
-            } else if (!isPremium.value && !showBenefitScreen.value) {
-              // 一度作成されたバナーを再表示する場合は resumeBanner を使用する
-              await AdMob.resumeBanner();
-            }
-          } catch (err) {
-            console.warn("AdMob Keyboard Sync Error:", err);
-          }
-        });
+        
 
         // --- HTML入力欄のフォーカス連動用（上記グローバル検知の補助） ---
         const handleInputFocus = () => {
@@ -2335,30 +2350,7 @@
         };
 
         // --- 💡 AdMobバナー制御：プレミアム画面の開閉と連動 ---
-        watch(showBenefitScreen, async (isOpened) => {
-          try {
-            const { AdMob } = window.Capacitor?.Plugins || {};
-            if (!AdMob) return;
-            
-            if (isOpened) {
-              // プレミアム画面が表示されている間はバナー広告を隠す
-              await AdMob.hideBanner();
-            } else {
-              // 画面を閉じた時、未課金であればバナー広告を再表示する
-              if (!isPremium.value) {
-                await AdMob.showBanner({
-                  adId: 'ca-app-pub-3940256099942544/6300978111',
-                  position: 'BOTTOM_CENTER',
-                  size: 'BANNER',
-                  margin: 50,
-                  isTesting: true
-                });
-              }
-            }
-          } catch (err) {
-            console.warn("AdMob Banner Toggle Error:", err);
-          }
-        });
+        
 
 
         const showGPlayModal = ref(false);
@@ -3982,22 +3974,7 @@
         const firmRoute = ref('chat');
         const showMemberProfileModal = ref(false);
 
-        watch(showMemberProfileModal, async (isOpened) => {
-          try {
-            const { AdMob } = window.Capacitor?.Plugins || {};
-            if (!AdMob) return;
-            
-            if (isOpened) {
-              await AdMob.hideBanner();
-            } else {
-              if (!isPremium.value && !showBenefitScreen.value) {
-                await AdMob.resumeBanner();
-              }
-            }
-          } catch (err) {
-            console.warn("AdMob Banner Toggle Error (Profile Modal):", err);
-          }
-        });
+        
         const activeFirmMember = ref(null);
 
         const openMemberProfile = (m) => {
