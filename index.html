@@ -462,7 +462,7 @@
   </style>
 </head>
 <body>
-  <div id="app" class="app-container" :class="{'has-ad': !isPremium && activeTab !== 'home' && !isKeyboardVisible}" v-cloak>
+  <div id="app" class="app-container" :class="{'has-ad': !isPremium && activeTab !== 'home' && activeTab !== 'profile' && !isKeyboardVisible}" v-cloak>
 
 
     
@@ -1295,7 +1295,7 @@
         </transition>
 
         <!-- Bottom Ad Banner -->
-        <div v-if="!isPremium && activeTab !== 'home' && !isKeyboardVisible" class="ad-banner">
+        <div v-if="!isPremium && activeTab !== 'home' && activeTab !== 'profile' && !isKeyboardVisible" class="ad-banner">
           [AD] ここにスポンサー広告が表示されます
         </div>
 
@@ -1495,6 +1495,7 @@
           const shouldShowAd = computed(() => {
             return admobInitialized.value && !isPremium.value && 
                    activeTab.value !== 'home' && 
+                   activeTab.value !== 'profile' && 
                    !isKeyboardVisible.value && 
                    !showBenefitScreen.value && 
                    !showMemberProfileModal.value;
@@ -2040,9 +2041,11 @@ const checkSession = async () => {
               };
               await supa.from('user_profiles').insert([newProfile]);
               isPremium.value = false;
+                tutorialCompleted.value = false;
               selfIntro.value = '';
             } else if (pData) {
               isPremium.value = pData.is_premium || false;
+                tutorialCompleted.value = pData.tutorial_completed || false;
               selfIntro.value = pData.bio || '';
             }
 
@@ -2202,7 +2205,7 @@ const checkSession = async () => {
               active_badge: activeBadge.value || '',
               completed_blocks: Object.keys(masteredBlocks.value || {}) || []
             };
-            const { error: progError } = await supa.from('user_progress').upsert([progress]);
+            const { error: progError } = await supa.from('user_progress').update(progress).eq('user_id', currentUser.value).eq('profession_code', currentMode);
             if (progError) console.warn('user_progress 保存エラー:', progError.message);
             
           } catch (e) {
@@ -2628,6 +2631,7 @@ const checkSession = async () => {
 
         // --- Tutorial Carousel ---
         const showTutorial = ref(false);
+        const tutorialCompleted = ref(false);
         const tutorialSlideIndex = ref(0);
         let touchStartX = 0;
         let touchEndX = 0;
@@ -2641,7 +2645,8 @@ const checkSession = async () => {
         ];
 
         const completeTutorial = () => {
-          localStorage.setItem('is_tutorial_completed', 'true');
+          tutorialCompleted.value = true;
+          supa.from('user_profiles').update({ tutorial_completed: true }).eq('id', currentUser.value).then();
           showTutorial.value = false;
         };
 
@@ -2672,8 +2677,7 @@ const checkSession = async () => {
         
         watch([activeTab, authScreen], () => {
           if (authScreen.value === 'app' && activeTab.value === 'home') {
-            const isCompleted = localStorage.getItem('is_tutorial_completed');
-            if (isCompleted !== 'true') {
+            if (!tutorialCompleted.value) {
               showTutorial.value = true;
             }
           }
@@ -4605,7 +4609,7 @@ const checkSession = async () => {
         });
 
         return {
-          showTutorial, tutorialSlideIndex, tutorialSlides, completeTutorial, nextTutorialSlide, handleTouchStart, handleTouchEnd,
+          showTutorial, tutorialCompleted, tutorialSlideIndex, tutorialSlides, completeTutorial, nextTutorialSlide, handleTouchStart, handleTouchEnd,
           handleInputFocus, handleInputBlur, isKeyboardVisible,
           ShigyoIAP,
           authScreen, currentUser, loginUsername, loginPassword, loginError, doLogin, doRegister, switchAuthMode, activeMode, selectMode,
