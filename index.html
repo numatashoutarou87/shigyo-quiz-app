@@ -3899,10 +3899,15 @@ const checkSession = async () => {
             const mappedMembers = members.map(member => {
               const prof = profiles.find(p => p.id === member.user_id);
               const name = prof ? prof.user_name : "アソシエイト（同期中）";
-              const level = prof ? prof.level : 1;
-              const badge = (prof && prof.active_badge) ? prof.active_badge : "🔰";
-              
-              const titleIdx = Math.floor((level - 1) / 5);
+                const level = prof ? prof.level : 1;
+                
+                let badge = "🔰";
+                if (prof && prof.active_badge) {
+                  const bInfo = ALL_BADGES.find(b => b.id === prof.active_badge);
+                  badge = bInfo ? bInfo.icon + " " + bInfo.name : prof.active_badge;
+                }
+                
+                const titleIdx = Math.floor((level - 1) / 5);
               return {
                 id: member.user_id,
                 farmId: targetFarmId,
@@ -4022,16 +4027,22 @@ const checkSession = async () => {
               if (data) {
                 const lv = data.level || 1;
                 const titleIdx = Math.floor((lv - 1) / 5);
-                member = {
-                  id: data.id,
-                  farmId: myFarmId.value, // キック処理判定用
-                  role: 'unknown',
-                  name: data.user_name || '名称未設定',
-                  level: lv,
-                  title: TITLES[Math.min(titleIdx, 19)] || '新人',
-                  badge: data.active_badge || '🔰',
-                  intro: data.bio || 'よろしくお願いします！'
-                };
+                let displayBadge = "🔰";
+                  if (data.active_badge) {
+                    const bInfo = ALL_BADGES.find(b => b.id === data.active_badge);
+                    displayBadge = bInfo ? bInfo.icon + " " + bInfo.name : data.active_badge;
+                  }
+
+                  member = {
+                    id: data.id,
+                    farmId: myFarmId.value, // キック処理判定用
+                    role: 'unknown',
+                    name: data.user_name || '名称未設定',
+                    level: lv,
+                    title: TITLES[Math.min(titleIdx, 19)] || '新人',
+                    badge: displayBadge,
+                    intro: data.bio || 'よろしくお願いします！'
+                  };
               }
             }
             
