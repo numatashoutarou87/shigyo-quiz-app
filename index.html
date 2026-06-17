@@ -965,8 +965,8 @@
                     </div>
                   </div>
                   <div class="chat-input-area" v-if="activeRoom?.type !== 'silent'">
-                    <input type="text" v-model="studyChatInput" placeholder="メッセージを送信" :disabled="!canSendChat" @keyup.enter="sendStudyChat">
-                    <button @click="sendStudyChat" :disabled="!canSendChat || !studyChatInput.trim()">送信</button>
+                    <input type="text" v-model="studyChatInput" placeholder="メッセージを送信" @focus="checkChatLimit" @keyup.enter="sendStudyChat">
+                    <button @click="sendStudyChat" :disabled="!studyChatInput.trim()">送信</button>
                   </div>
                   <div v-else style="padding: 10px; text-align: center; font-size: 11px; color: #888; background: #eee;">
                     サイレント自習室のためチャットは無効化されています。
@@ -1064,7 +1064,7 @@
                   >申請中 (取消)</button>
                   <button class="primary-btn" 
                     v-else
-                    @click="sendFriendRequestAPI(user)" 
+                    @click="sendFriendRequest(user)" 
                     style="padding: 6px 12px; font-size: 11px; width: auto; background: var(--accent-gold); color: #fff; border: none; cursor:pointer;"
                   >申請</button>
                 </div>
@@ -1089,8 +1089,8 @@
                 </div>
               </div>
               <div class="chat-input-area" style="margin-top: 15px;">
-                <input type="text" v-model="directChatInput" placeholder="メッセージを送信..." :disabled="!canSendChat" @keyup.enter="sendDirectChat" maxlength="500">
-                <button @click="sendDirectChat" :disabled="!canSendChat || !directChatInput.trim()">送信</button>
+                <input type="text" v-model="directChatInput" placeholder="メッセージを送信..." @focus="checkChatLimit" @keyup.enter="sendDirectChat" maxlength="500">
+                <button @click="sendDirectChat" :disabled="!directChatInput.trim()">送信</button>
               </div>
               <div style="text-align: right; font-size: 10px; color: #888; margin-top: 4px; padding-right: 70px;">{{ directChatInput.length }} / 500</div>
             </div>
@@ -1173,8 +1173,8 @@
                   </div>
                 </div>
                 <div class="chat-input-area">
-                  <input type="text" v-model="firmChatInput" placeholder="発言する..." :disabled="!canSendChat" @keyup.enter="sendFirmChat" maxlength="500">
-                  <button @click="sendFirmChat" :disabled="!canSendChat || !firmChatInput.trim()">送信</button>
+                  <input type="text" v-model="firmChatInput" placeholder="発言する..." @focus="checkChatLimit" @keyup.enter="sendFirmChat" maxlength="500">
+                  <button @click="sendFirmChat" :disabled="!firmChatInput.trim()">送信</button>
                 </div>
                 <div style="text-align: right; font-size: 10px; color: #888; margin-top: 4px; padding-right: 70px;">{{ firmChatInput.length }} / 500</div>
               </div>
@@ -3478,6 +3478,15 @@
         };
 
         const acceptFriendRequest = async (requestId) => {
+            const limit = isPremium.value ? 100 : 10;
+            if (friendsList.value.length >= limit) {
+              if (!isPremium.value) {
+                showPaywall('フレンド数の上限', '無料プランでのフレンド登録は10人までです。プレミアムに加入して上限を100人に増やしましょう！');
+              } else {
+                alert('フレンド数が上限（100人）に達しています。これ以上フレンドを追加できません。');
+              }
+              return;
+            }
           try {
             const { error } = await supa
               .from('friendships')
@@ -3675,6 +3684,12 @@
         };
 
         const canSendChat = computed(() => isPremium.value || chatCount.value < 10);
+          const checkChatLimit = (e) => {
+            if (!canSendChat.value) {
+              if (e && e.target) e.target.blur();
+              showPaywall('チャット送信枠の上限', '無料プランでの送信は1日10回までです。プレミアムに加入しましょう！');
+            }
+          };
         
         const studyChatInput = ref('');
         let currentChatChannel = null;
@@ -4034,7 +4049,16 @@
         };
 
         const sendFriendRequest = (m) => {
-          if (!m || isAlreadyFriend(m.id) || requestedFriends.value.includes(m.id)) return;
+            const limit = isPremium.value ? 100 : 10;
+            if (friendsList.value.length >= limit) {
+              if (!isPremium.value) {
+                showPaywall('フレンド数の上限', '無料プランでのフレンド登録は10人までです。プレミアムに加入して上限を100人に増やしましょう！');
+              } else {
+                alert('フレンド数が上限（100人）に達しています。これ以上フレンド申請はできません。');
+              }
+              return;
+            }
+            if (!m || isAlreadyFriend(m.id) || requestedFriends.value.includes(m.id)) return;
           sendFriendRequestAPI(m);
         };
 
@@ -4612,7 +4636,7 @@
           agreedToTerms, showTermsModal, showPrivacyModal,
 
           isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, currentTitle, currentLevel, nextLevelExp, currentLevelStartExp, expProgressPercent, remainingExpToNext,
-          chatCount, canSendChat, dailyCorrect, dailyCombo, unlockedBadges, activeBadge, activeBadgeDisplay, validBadgeCount,
+          chatCount, canSendChat, dailyCorrect, dailyCombo, unlockedBadges, activeBadge, activeBadgeDisplay, validBadgeCount, checkChatLimit,
           activeTab, studyRoute, profileTab,
           loadStatus, isLoading, paywallConfig, showPaywall,
           
