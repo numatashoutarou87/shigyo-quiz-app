@@ -1610,11 +1610,6 @@
           
           enablePremiumUI() {
             isPremium.value = true;
-            // 課金時はAdMobバナーのコンテナを非表示に
-            const adContainer = document.getElementById('ad-container');
-            if (adContainer) {
-              adContainer.style.display = 'none';
-            }
           },
           
           async loadOfferings() {
@@ -2324,8 +2319,10 @@
         
         const isKeyboardVisible = ref(false);
 
-        // --- グローバルなキーボード開閉検知 ---
-        onMounted(() => {
+        const admobInitialized = ref(false);
+
+        // --- グローバルなキーボード開閉検知 & AdMob初期化（インタースティシャル） ---
+        onMounted(async () => {
           if (window.Capacitor?.Plugins?.Keyboard) {
             window.Capacitor.Plugins.Keyboard.addListener('keyboardWillShow', () => { isKeyboardVisible.value = true; });
             window.Capacitor.Plugins.Keyboard.addListener('keyboardWillHide', () => { isKeyboardVisible.value = false; });
@@ -2338,6 +2335,43 @@
               }
               isKeyboardVisible.value = window.visualViewport.height < maxVh * 0.85;
             });
+          }
+
+          // AdMob初期化（バナーではなくインタースティシャル用）
+          try {
+            const { AdMob } = window.Capacitor?.Plugins || {};
+            if (AdMob) {
+              await AdMob.initialize({ requestTrackingAuthorization: true });
+              admobInitialized.value = true;
+              
+              // プレミアムでなければ事前にインタースティシャル広告を読み込んでおく
+              if (!isPremium.value) {
+                await AdMob.prepareInterstitial({
+                  adId: 'ca-app-pub-3940256099942544/1033173712', // テスト用AdUnitId
+                  isTesting: true
+                }).catch(() => {});
+              }
+            }
+          } catch (e) {
+            console.warn('AdMob Initialization Error:', e);
+          }
+        });
+
+        // ユーザーのプレミアム状態を監視し、広告の準備を制御
+        watch(isPremium, async (newVal) => {
+          try {
+            const { AdMob } = window.Capacitor?.Plugins || {};
+            if (!AdMob || !admobInitialized.value) return;
+
+            if (!newVal) {
+              // 通常プランに戻ったら再度準備しておく
+              await AdMob.prepareInterstitial({
+                adId: 'ca-app-pub-3940256099942544/1033173712',
+                isTesting: true
+              }).catch(() => {});
+            }
+          } catch (e) {
+            console.warn('AdMob Premium Toggle Error:', e);
           }
         });
 
@@ -2505,11 +2539,31 @@
         const pendingTransitionCallback = ref(null);
         let adTimer = null;
 
-        const triggerInterstitial = (callback, force = false) => {
+        const triggerInterstitial = async (callback, force = false) => {
           if (!force && (isPremium.value || Math.random() >= 0.3)) {
             if (callback) callback();
             return;
           }
+
+          try {
+            const { AdMob } = window.Capacitor?.Plugins || {};
+            if (AdMob && admobInitialized.value) {
+              // ネイティブのインタースティシャル広告を表示
+              await AdMob.showInterstitial();
+              // 次回のために再準備
+              AdMob.prepareInterstitial({
+                adId: 'ca-app-pub-3940256099942544/1033173712',
+                isTesting: true
+              }).catch(() => {});
+              
+              if (callback) callback();
+              return;
+            }
+          } catch (e) {
+            console.warn("AdMob Interstitial Error, falling back to HTML mock:", e);
+          }
+          
+          // フォールバック（AdMob未対応・エラー時）
           pendingTransitionCallback.value = callback;
           adCountdown.value = 3;
           showInterstitialAd.value = true;
