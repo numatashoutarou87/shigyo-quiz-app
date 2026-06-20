@@ -517,7 +517,7 @@
           <div class="benefit-icon">🤝</div>
           <div class="benefit-text">
             <h4>フレンド枠100人解放</h4>
-            <p>初期15人から100人まで拡張。全国の意識高いライバルと繋がりモチベーションを保ちます。</p>
+            <p>初期10人から100人まで拡張。全国の意識高いライバルと繋がりモチベーションを保ちます。</p>
           </div>
         </div>
         <div class="benefit-item">
@@ -529,10 +529,16 @@
         </div>
       </div>
       
-      <button class="benefit-cta-btn" @click="showGPlayModal = true; showBenefitScreen = false;">
-        <span>プレミアムに加入する</span>
-        <span class="benefit-cta-sub">月額 380円 / いつでもキャンセル可能</span>
+      <button class="benefit-cta-btn" @click="doRevenueCatPurchase" :disabled="isProcessingPayment || !rcActivePackage">
+        <span class="spinner" style="width:16px;height:16px;border-width:2px;margin:0;border-top-color:white;" v-if="isProcessingPayment"></span>
+        <span v-if="!isProcessingPayment">購入する</span>
+        <span class="benefit-cta-sub">{{ rcActivePackage ? rcActivePackage.product.priceString + ' / いつでもキャンセル可能' : '価格情報取得中...' }}</span>
       </button>
+      <div style="text-align: center; margin-top: 16px;">
+        <button style="background:none; border:none; color: #a1a1aa; text-decoration: underline; cursor: pointer; font-size: 14px;" @click="doRevenueCatRestore" :disabled="isProcessingPayment">
+          購入を復元する (Restore Purchases)
+        </button>
+      </div>
     </div>
 
     <!-- GOOGLE PLAY MODAL -->
@@ -1268,7 +1274,7 @@
                     <div v-if="isPremium" style="font-size: 16px; font-weight: bold; color: var(--accent-gold);">
                       👑 プレミアム会員
                       <div style="margin-top: 15px;">
-                        <button @click="cancelSubscription" style="font-size: 12px; background: transparent; color: #9ca3af; border: 1px solid #d1d5db; padding: 6px 12px; border-radius: 4px; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.color='#ef4444'; this.style.borderColor='#ef4444';" onmouseout="this.style.color='#9ca3af'; this.style.borderColor='#d1d5db';">サブスクリプションを解約する</button>
+                        <button @click="manageSubscription" style="font-size: 12px; background: transparent; color: #9ca3af; border: 1px solid #d1d5db; padding: 6px 12px; border-radius: 4px; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.color='#ef4444'; this.style.borderColor='#ef4444';" onmouseout="this.style.color='#9ca3af'; this.style.borderColor='#d1d5db';">サブスクリプションの管理</button>
                       </div>
                     </div>
                     <div v-else>
@@ -1515,13 +1521,55 @@
             }
           };
 
+          const setupRevenueCat = async () => {
+            try {
+              const { Purchases } = window.Capacitor?.Plugins || {};
+              if (!Purchases) {
+                console.log('【RevenueCat】ブラウザ環境、またはプラグイン未登録のため初期化をスキップしました。');
+                return;
+              }
+
+              // 開発用デバッグログを有効化
+              await Purchases.setLogLevel({ level: 'DEBUG' });
+
+              // Supabaseから現在のユーザー情報を取得
+              const { data: { user } } = await supa.auth.getUser();
+
+              if (user) {
+                // SupabaseのUUIDとRevenueCatを紐付けて初期化
+                await Purchases.configure({
+                  apiKey: "goog_NUQPuhdoxfBGclWnrxSDSnEuctD",
+                  appUserID: user.id 
+                });
+                console.log('RevenueCat初期化成功 (ユーザー紐付け完了):', user.id);
+              } else {
+                // 未ログイン状態の場合
+                await Purchases.configure({
+                  apiKey: "goog_NUQPuhdoxfBGclWnrxSDSnEuctD"
+                });
+                console.log('RevenueCat初期化成功 (匿名ユーザー)');
+              }
+
+              // 初期化完了後、Offeringsを自動取得してStateに保存
+              await loadOfferings();
+            } catch (error) {
+              console.error('RevenueCatの初期化に失敗:', error);
+            }
+          };
+
           await checkSession();
+          await setupRevenueCat();
+          await ShigyoIAP.init();
 
           // 万が一のセッション変更時も監視（他タブでのログアウト等に対応）
-          supa.auth.onAuthStateChange((event, session) => {
+          supa.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_OUT' || !session) {
               currentUser.value = null;
               authScreen.value = 'login';
+              await setupRevenueCat(); // ログアウト時にも匿名として再初期化
+            } else if (event === 'SIGNED_IN') {
+              await setupRevenueCat(); // ログイン時にユーザー紐付け
+              await ShigyoIAP.init();
             }
           });
         });
@@ -1545,16 +1593,12 @@
         
         // --- 課金中枢コントロールオブジェクト（ShigyoIAP） ---
         const ShigyoIAP = {
-          async init(supabaseUserId) {
+          async init() {
             try {
               const { Purchases } = window.Capacitor?.Plugins || {};
               if (!Purchases) return;
               
-              await Purchases.configure({
-                apiKey: "goog_xxxxxxxxxxxxxxxxxxxxxxxxxxx", // 仮のRevenueCat API Key
-                appUserID: supabaseUserId
-              });
-              
+              // 初期化は setupRevenueCat で行われるため、状態の取得のみ行う
               const info = await Purchases.getCustomerInfo();
               if (info.entitlements.active["premium_access"]) {
                 this.enablePremiumUI();
@@ -2318,6 +2362,96 @@
         const showGPlayModal = ref(false);
         const isProcessingPayment = ref(false);
 
+        // --- RevenueCat State & Logic ---
+        const rcPackages = ref([]);
+        const rcActivePackage = computed(() => rcPackages.value.length > 0 ? rcPackages.value[0] : null);
+
+        const loadOfferings = async () => {
+          try {
+            const { Purchases } = window.Capacitor?.Plugins || {};
+            if (!Purchases) return;
+            const offerings = await Purchases.getOfferings();
+            if (offerings.current && offerings.current.availablePackages.length > 0) {
+              rcPackages.value = offerings.current.availablePackages;
+            }
+          } catch (e) {
+            console.error("Offerings取得エラー:", e);
+          }
+        };
+
+        const doRevenueCatPurchase = async () => {
+          if (!rcActivePackage.value) {
+            alert('現在パッケージ情報を取得中、または設定待ちです。しばらくお待ちください。');
+            return;
+          }
+          
+          isProcessingPayment.value = true;
+          try {
+            const { Purchases } = window.Capacitor?.Plugins || {};
+            if (!Purchases) {
+              alert("ブラウザ環境では購入できません。実機でお試しください。");
+              isProcessingPayment.value = false;
+              return;
+            }
+            
+            const { customerInfo } = await Purchases.purchasePackage({ packageIdentifier: rcActivePackage.value.identifier });
+            
+            if (customerInfo.entitlements.active['premium'] || customerInfo.entitlements.active['premium_access']) {
+              // バックエンドにも同期
+              const { error: dbError } = await supa.from('user_profiles').update({ is_premium: true }).eq('id', currentUser.value);
+              
+              if (dbError) {
+                throw new Error('データベース連携に失敗しました: ' + dbError.message);
+              }
+
+              isPremium.value = true;
+              alert("購入が完了しました！");
+              showBenefitScreen.value = false;
+            }
+          } catch (e) {
+            console.error("購入エラー:", e);
+            if (!e.userCancelled) {
+              alert("購入処理に失敗しました: " + (e.message || ''));
+            }
+          } finally {
+            isProcessingPayment.value = false;
+          }
+        };
+
+        const doRevenueCatRestore = async () => {
+          isProcessingPayment.value = true;
+          try {
+            const { Purchases } = window.Capacitor?.Plugins || {};
+            if (!Purchases) {
+              alert("ブラウザ環境では復元できません。実機でお試しください。");
+              isProcessingPayment.value = false;
+              return;
+            }
+            
+            const customerInfo = await Purchases.restorePurchases();
+            if (customerInfo.entitlements.active['premium'] || customerInfo.entitlements.active['premium_access']) {
+              // バックエンドにも同期
+              const { error: dbError } = await supa.from('user_profiles').update({ is_premium: true }).eq('id', currentUser.value);
+              
+              if (dbError) {
+                throw new Error('データベース連携に失敗しました: ' + dbError.message);
+              }
+
+              isPremium.value = true;
+              alert("購入を復元しました！");
+              showBenefitScreen.value = false;
+            } else {
+              alert("有効なプレミアム権利が見つかりませんでした。");
+            }
+          } catch (e) {
+            console.error("復元エラー:", e);
+            alert("復元処理に失敗しました: " + (e.message || ''));
+          } finally {
+            isProcessingPayment.value = false;
+          }
+        };
+        // --------------------------------
+
         const doGooglePlayPurchase = async () => {
           isProcessingPayment.value = true;
           
@@ -2341,28 +2475,28 @@
           }
         };
 
-        const cancelSubscription = async () => {
-          if (!confirm("本当にサブスクリプションを解約しますか？\n解約すると、ただちにプレミアム特典が利用できなくなります。")) return;
-
+        const manageSubscription = async () => {
           try {
-            // クラウドの is_premium を false に確実にダウングレードする
-            const { error } = await supa
-              .from('user_profiles')
-              .update({ is_premium: false })
-              .eq('id', currentUser.value);
-
-            if (error) {
-              console.error('解約エラー:', error);
-              alert('解約処理に失敗しました: ' + error.message);
+            const { Purchases } = window.Capacitor?.Plugins || {};
+            if (!Purchases) {
+              alert("ブラウザ環境では実行できません。実機でお試しください。");
               return;
             }
-
-            // ローカルのUI状態を即座に通常プランに切り替え
-            isPremium.value = false;
-            alert("サブスクリプションを解約し、通常プランに戻りました。");
+            
+            const info = await Purchases.getCustomerInfo();
+            if (info && info.managementURL) {
+              const { Browser } = window.Capacitor?.Plugins || {};
+              if (Browser) {
+                await Browser.open({ url: info.managementURL });
+              } else {
+                window.open(info.managementURL, '_blank');
+              }
+            } else {
+              alert("管理画面を開けませんでした。ご利用のアプリストア（Playストアなど）から直接解約手続きを行ってください。");
+            }
           } catch (e) {
-            console.error('予期せぬエラー:', e);
-            alert('解約処理中に予期せぬエラーが発生しました。');
+            console.error('管理画面を開く際にエラー:', e);
+            alert('管理画面を開く際にエラーが発生しました: ' + (e.message || ''));
           }
         };
 
@@ -2546,8 +2680,8 @@
           await loadFriendsList();
           setupRealtimeFriendships();
           
-          // ログイン成功時にIAPを安全に初期化（プレミアム判定の実行）
-          await ShigyoIAP.init(user.id);
+          // onAuthStateChangeのSIGNED_INでも処理されるが、念のためここでもIAP状態を同期
+          await ShigyoIAP.init();
 
           activeMode.value = null;
           authScreen.value = 'app';
@@ -4622,7 +4756,8 @@
           selfIntro, saveSelfIntro, friendCount, friendLogs,
           addExp, checkBadges, showLevelUp, levelUpMessage, showBadgeToast, badgeToastMessage,
 
-          showBenefitScreen, showGPlayModal, isProcessingPayment, doGooglePlayPurchase, cancelSubscription,
+          showBenefitScreen, showGPlayModal, isProcessingPayment, doGooglePlayPurchase, manageSubscription,
+          rcPackages, rcActivePackage, loadOfferings, doRevenueCatPurchase, doRevenueCatRestore,
           showInterstitialAd, adCountdown, triggerInterstitial, closeInterstitialAd,
 
           examCountdownString, isExamLive, forceStartRealMockExam, isMockDebugMode,
