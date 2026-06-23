@@ -4050,6 +4050,13 @@
               }
             }
 
+            // 自分自身の権限（リーダー・メンバー）が変更されている可能性があるので、取得したデータから同期する
+            const myId = currentUser.value;
+            const myMemberData = members.find(m => String(m.user_id) === String(myId));
+            if (myMemberData) {
+              isFirmOwner.value = (myMemberData.role === 'leader');
+            }
+
             // 2. 取得したuser_idの配列を作成
             const userIds = members.map(m => m.user_id);
 
