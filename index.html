@@ -1696,15 +1696,22 @@
         const activeFriend = ref(null);
         const directChatInput = ref('');
 
-        const SUBJECTS = [
-          { id: 'keizai', name: '📊 経済学・経済政策' },
-          { id: 'zaimu', name: '💰 財務・会計' },
-          { id: 'kigyou', name: '🏢 企業経営理論' },
-          { id: 'unei', name: '🏭 運営管理' },
-          { id: 'houmu', name: '⚖️ 経営法務' },
-          { id: 'jouhou', name: '💻 経営情報システム' },
-          { id: 'chusho', name: '📈 中小企業経営・政策' }
-        ];
+        const PROFESSION_SUBJECTS = {
+          shindanshi: [
+            { id: 'keizai', name: '📊 経済学・経済政策' },
+            { id: 'zaimu', name: '💰 財務・会計' },
+            { id: 'kigyou', name: '🏢 企業経営理論' },
+            { id: 'unei', name: '🏭 運営管理' },
+            { id: 'houmu', name: '⚖️ 経営法務' },
+            { id: 'jouhou', name: '💻 経営情報システム' },
+            { id: 'chusho', name: '📈 中小企業経営・政策' }
+          ],
+          gyousei: [],
+          takken: [],
+          sharoushi: [],
+          zeirishi: []
+        };
+        const SUBJECTS = computed(() => PROFESSION_SUBJECTS[activeMode.value] || PROFESSION_SUBJECTS['shindanshi']);
 
         const generateRooms = () => {
           const rooms = [];
@@ -2080,8 +2087,9 @@
             // 3. ファーム所属状態の同期
             const { data: myMembership } = await supa
                 .from('farm_members')
-                .select('farm_id, role')
+                .select('farm_id, role, farms!inner(profession_code)')
                 .eq('user_id', userId)
+                .eq('farms.profession_code', currentMode)
                 .limit(1)
                 .single();
                 
@@ -2130,7 +2138,7 @@
           
           let masteredSubjectsCount = 0;
           
-          for (let s of SUBJECTS) {
+          for (let s of SUBJECTS.value) {
             const baseCode = subjCodeMap[s.id];
             if (!baseCode) continue;
             
@@ -2861,7 +2869,7 @@
             const startIdx = (blockIndex - 1) * 100;
             const endIdx = startIdx + 99; // 0-indexed for Supabase range, inclusive (100 items)
             
-            const subjName = SUBJECTS.find(s => s.id === subjId)?.name || '科目';
+            const subjName = SUBJECTS.value.find(s => s.id === subjId)?.name || '科目';
             
             // CSVインポート時の名前に合わせるためのマッピング
             const subjNameMap = {
@@ -3315,14 +3323,14 @@
                   }
                   saveUserProfile();
                   
-                  const subjName = SUBJECTS.find(s => s.id === currentStudySubjId.value)?.name || '';
+                  const subjName = SUBJECTS.value.find(s => s.id === currentStudySubjId.value)?.name || '';
                   const cleanName = subjName.replace(/[^ぁ-んァ-ン一-龥a-zA-Z]/g, '');
                   
                   triggerCelebration(`【祝・${cleanName}マスター！】\n1,000問の壁を突破！この努力は裏切らない！`);
                   
                   // 全科目（7科目）完全制覇判定
                   let allSubjMastered = true;
-                  for (let s of SUBJECTS) {
+                  for (let s of SUBJECTS.value) {
                     if (!masteredSubjects.value[s.id]) {
                       allSubjMastered = false; break;
                     }
@@ -3402,9 +3410,17 @@
                   });
                 }
               }
+              const orConditions = data.map(u => `and(user_id.eq.${u.id},profession_code.eq.${u.current_mode || 'shindanshi'})`).join(',');
+              const { data: progressData } = await supa.from('user_progress').select('*').or(orConditions);
+              
               searchedUsers.value = data.map(u => {
-                const titleIdx = Math.floor(((u.level || 1) - 1) / 5);
-                return { ...u, title: TITLES[Math.min(titleIdx, 19)] || '新人' };
+                const prog = progressData ? progressData.find(p => p.user_id === u.id && p.profession_code === (u.current_mode || 'shindanshi')) : null;
+                const displayLevel = prog ? prog.level : 1;
+                const displayBadge = prog ? prog.active_badge : '';
+                const displayUnlocked = prog ? prog.unlocked_badges : [];
+                
+                const titleIdx = Math.floor((displayLevel - 1) / 5);
+                return { ...u, level: displayLevel, active_badge: displayBadge, unlocked_badges: displayUnlocked, title: TITLES[Math.min(titleIdx, 19)] || '新人' };
               });
             }
           } catch (e) {
@@ -3435,10 +3451,10 @@
                 sender_id,
                 receiver_id,
                 sender:user_profiles!friendships_sender_id_fkey (
-                  id, user_name, level, active_badge, unlocked_badges
+                  id, user_name, current_mode
                 ),
                 receiver:user_profiles!friendships_receiver_id_fkey (
-                  id, user_name, level, active_badge, unlocked_badges
+                  id, user_name, current_mode
                 )
               `)
               .eq('status', 'accepted')
@@ -3450,38 +3466,44 @@
             }
             
             if (data && data.length > 0) {
-              friendsList.value = data.map(item => {
-                // Supabaseからの結合結果が配列になる場合を吸収
+              const rawProfiles = data.map(item => {
                 let s = item.sender;
                 let r = item.receiver;
                 if (Array.isArray(s)) s = s[0];
                 if (Array.isArray(r)) r = r[0];
-
-                // 【完全修正】最上位のsender_idで厳格に判定し「自分ではない方」を抽出
-                const friendProfile = (item.sender_id === myId) ? r : s;
+                return (item.sender_id === myId) ? r : s;
+              }).filter(Boolean);
+              
+              if (rawProfiles.length > 0) {
+                const orConditions = rawProfiles.map(p => `and(user_id.eq.${p.id},profession_code.eq.${p.current_mode || 'shindanshi'})`).join(',');
+                const { data: progressData } = await supa.from('user_progress').select('*').or(orConditions);
                 
-                if (!friendProfile) {
-                  console.error("フレンドデータの抽出に失敗しました:", item);
-                  return null;
-                }
-                
-                let displayBadge = "🔰";
-                if (friendProfile.active_badge) {
-                  const bInfo = ALL_BADGES.find(b => b.id === friendProfile.active_badge);
-                  displayBadge = bInfo ? bInfo.icon + " " + bInfo.name : friendProfile.active_badge;
-                }
+                friendsList.value = rawProfiles.map(friendProfile => {
+                  const prog = progressData ? progressData.find(p => p.user_id === friendProfile.id && p.profession_code === (friendProfile.current_mode || 'shindanshi')) : null;
+                  const displayLevel = prog ? prog.level : 1;
+                  const displayBadgeId = prog ? prog.active_badge : '';
+                  const displayUnlocked = prog ? prog.unlocked_badges : [];
+                  
+                  let displayBadge = "🔰";
+                  if (displayBadgeId) {
+                    const bInfo = ALL_BADGES.find(b => b.id === displayBadgeId);
+                    displayBadge = bInfo ? bInfo.icon + " " + bInfo.name : displayBadgeId;
+                  }
 
-                // フォールバック付きで描画用オブジェクトを生成
-                return {
-                  id: friendProfile.id || 'unknown',
-                  name: friendProfile.user_name || '不明なユーザー',
-                  icon: '👤',
-                  level: friendProfile.level || 1,
-                  title: TITLES[Math.min(Math.floor(((friendProfile.level || 1) - 1) / 5), 19)] || '新人',
-                  badge: displayBadge,
-                  unlocked_badges: friendProfile.unlocked_badges || []
-                };
-              }).filter(Boolean); // nullの要素を安全に除外
+                  return {
+                    id: friendProfile.id || 'unknown',
+                    name: friendProfile.user_name || '不明なユーザー',
+                    icon: '👤',
+                    level: displayLevel,
+                    title: TITLES[Math.min(Math.floor((displayLevel - 1) / 5), 19)] || '新人',
+                    badge: displayBadge,
+                    unlocked_badges: displayUnlocked,
+                    current_mode: friendProfile.current_mode || 'shindanshi'
+                  };
+                });
+              } else {
+                friendsList.value = [];
+              }
             } else {
               friendsList.value = [];
             }
@@ -3769,7 +3791,7 @@
             // 1. ファームをデータベースに登録
             const { data: newFarm, error: farmError } = await supa
               .from('farms')
-              .insert([{ name: fn, description: fi, current_members: 1 }])
+              .insert([{ name: fn, description: fi, current_members: 1, profession_code: activeMode.value || 'shindanshi' }])
               .select()
               .single();
 
@@ -3995,8 +4017,9 @@
 
               const { data: myMembership } = await supa
                 .from('farm_members')
-                .select('farm_id, role')
+                .select('farm_id, role, farms!inner(profession_code)')
                 .eq('user_id', realUserId)
+                .eq('farms.profession_code', activeMode.value || 'shindanshi')
                 .neq('role', 'pending')
                 .limit(1)
                 .single();
@@ -4355,8 +4378,9 @@
               const realUserId = authRes.data.user?.id || currentUser.value;
               const { data: myMembership } = await supa
                 .from('farm_members')
-                .select('farm_id, role')
+                .select('farm_id, role, farms!inner(profession_code)')
                 .eq('user_id', realUserId)
+                .eq('farms.profession_code', activeMode.value || 'shindanshi')
                 .neq('role', 'pending')
                 .limit(1)
                 .single();
@@ -4484,6 +4508,7 @@
             const { data, error } = await supa
               .from('farms')
               .select('*')
+              .eq('profession_code', activeMode.value || 'shindanshi')
               .order('created_at', { ascending: false });
             if (data && !error) {
               farmsList.value = data;
@@ -4503,6 +4528,7 @@
             const { data, error } = await supa
               .from('farms')
               .select('*')
+              .eq('profession_code', activeMode.value || 'shindanshi')
               .or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%`)
               .order('created_at', { ascending: false });
             if (data && !error) {
