@@ -4107,12 +4107,12 @@
           
           farmGlobalChannel
             .on('broadcast', { event: 'farm_member_applied' }, payload => {
-              if (payload.payload?.farm_id === myFarmId.value && isFirmOwner.value) {
+              if (String(payload.payload?.farm_id) === String(myFarmId.value) && isFirmOwner.value) {
                 loadFarmMembers();
               }
             })
             .on('broadcast', { event: 'farm_member_approved' }, payload => {
-              if (payload.payload?.user_id === currentUser.value && !isFarmMember.value) {
+              if (String(payload.payload?.user_id) === String(currentUser.value) && !isFarmMember.value) {
                 alert("ファームへの加入が承認されました！");
                 isFarmMember.value = true;
                 myFarmId.value = payload.payload.farm_id;
@@ -4120,7 +4120,7 @@
                 firmRoute.value = 'chat';
                 saveUserProfile();
               }
-              if (payload.payload?.farm_id === myFarmId.value) loadFarmMembers();
+              if (String(payload.payload?.farm_id) === String(myFarmId.value)) loadFarmMembers();
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'farm_members' }, async (payload) => {
               console.log("【リアルタイム検知】メンバー行の削除（DELETE）をキャッチしました:", payload);
@@ -4189,6 +4189,20 @@
         };
 
         const firmRoute = ref('chat');
+        let pendingPollInterval = null;
+        watch(firmRoute, (newRoute) => {
+          if (newRoute === 'pending_members') {
+            loadFarmMembers();
+            pendingPollInterval = setInterval(() => {
+              loadFarmMembers();
+            }, 5000);
+          } else {
+            if (pendingPollInterval) {
+              clearInterval(pendingPollInterval);
+              pendingPollInterval = null;
+            }
+          }
+        });
         const showMemberProfileModal = ref(false);
 
         
