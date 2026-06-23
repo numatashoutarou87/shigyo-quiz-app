@@ -4465,7 +4465,8 @@
             const { data: remainingMembers, error: countError } = await supa
               .from('farm_members')
               .select('user_id')
-              .eq('farm_id', targetFarmId);
+              .eq('farm_id', targetFarmId)
+              .neq('role', 'pending');
 
             // 5. 【自動消滅システム】もし残りのメンバーが「0人」なら、ファーム本体とチャット履歴を完全に抹消する
             if (!countError && (!remainingMembers || remainingMembers.length === 0)) {
