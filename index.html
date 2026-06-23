@@ -1134,7 +1134,7 @@
                         <div class="friend-level" style="color: #666; font-size: 11px; line-height: 1.4;">{{ f.description || f.intro }}</div>
                       </div>
                       <button v-if="f.id === myPendingFarmId" class="primary-btn" style="padding: 6px 12px; font-size: 11px; width: auto; background: #888; color: white;" disabled>承認待ち</button>
-                      <button v-else class="primary-btn" @click="joinFirm(f)" :disabled="!!myPendingFarmId" style="padding: 6px 12px; font-size: 11px; width: auto;">加入申請</button>
+                      <button v-else class="primary-btn" @click="joinFirm(f)" style="padding: 6px 12px; font-size: 11px; width: auto;">加入申請</button>
                     </div>
                   </div>
                 </div>
@@ -3465,6 +3465,12 @@
                   return null;
                 }
                 
+                let displayBadge = "🔰";
+                if (friendProfile.active_badge) {
+                  const bInfo = ALL_BADGES.find(b => b.id === friendProfile.active_badge);
+                  displayBadge = bInfo ? bInfo.icon + " " + bInfo.name : friendProfile.active_badge;
+                }
+
                 // フォールバック付きで描画用オブジェクトを生成
                 return {
                   id: friendProfile.id || 'unknown',
@@ -3472,6 +3478,7 @@
                   icon: '👤',
                   level: friendProfile.level || 1,
                   title: TITLES[Math.min(Math.floor(((friendProfile.level || 1) - 1) / 5), 19)] || '新人',
+                  badge: displayBadge,
                   unlocked_badges: friendProfile.unlocked_badges || []
                 };
               }).filter(Boolean); // nullの要素を安全に除外
@@ -3511,13 +3518,24 @@
                 // Supabaseからの結合結果が配列になる場合と単体オブジェクトになる場合を吸収
                 let profile = req.sender_profile;
                 if (Array.isArray(profile)) profile = profile[0];
+                if (profile) {
+                  let displayBadge = "🔰";
+                  if (profile.active_badge) {
+                    const bInfo = ALL_BADGES.find(b => b.id === profile.active_badge);
+                    displayBadge = bInfo ? bInfo.icon + " " + bInfo.name : profile.active_badge;
+                  }
+                  profile.badge = displayBadge;
+                  profile.title = TITLES[Math.min(Math.floor(((profile.level || 1) - 1) / 5), 19)] || '新人';
+                }
+
                 return { 
                   ...req, 
                   sender_profile: profile || { 
-                    user_name: profile?.user_name || '不明なユーザー',
-                    level: profile?.level || 1,
-                    title: TITLES[Math.min(Math.floor(((profile?.level || 1) - 1) / 5), 19)] || '新人',
-                    unlocked_badges: profile?.unlocked_badges || []
+                    user_name: '不明なユーザー',
+                    level: 1,
+                    title: '新人',
+                    badge: '🔰',
+                    unlocked_badges: []
                   } 
                 };
               });
@@ -3804,12 +3822,18 @@
             // Supabaseから最新のプロフィール情報を取得
             const { data, error } = await supa.from('user_profiles').select('*').eq('id', u.id).single();
             if (data) {
+              let displayBadge = "🔰";
+              if (data.active_badge) {
+                const bInfo = ALL_BADGES.find(b => b.id === data.active_badge);
+                displayBadge = bInfo ? bInfo.icon + " " + bInfo.name : data.active_badge;
+              }
+
               activeFirmMember.value = {
                 id: data.id,
                 name: data.user_name,
                 level: data.level || 1,
                 title: TITLES[Math.min(Math.floor(((data.level || 1) - 1) / 5), 19)] || '新人',
-                badge: data.badge || '🔰',
+                badge: displayBadge,
                 intro: data.bio || 'よろしくお願いします。'
               };
             } else {
@@ -4075,8 +4099,29 @@
 
         // メンバー一覧のリアルタイム自動更新を仕掛ける
         // メンバー一覧のリアルタイム自動更新と解散・脱退時の強制送還を仕掛ける
+        let farmGlobalChannel = null;
         const initFarmMembersSubscription = () => {
-          supa.channel('farm_membership_global_changes')
+          farmGlobalChannel = supa.channel('farm_membership_global_changes', {
+            config: { broadcast: { self: true, ack: false } }
+          });
+          
+          farmGlobalChannel
+            .on('broadcast', { event: 'farm_member_applied' }, payload => {
+              if (payload.payload?.farm_id === myFarmId.value && isFirmOwner.value) {
+                loadFarmMembers();
+              }
+            })
+            .on('broadcast', { event: 'farm_member_approved' }, payload => {
+              if (payload.payload?.user_id === currentUser.value && !isFarmMember.value) {
+                alert("ファームへの加入が承認されました！");
+                isFarmMember.value = true;
+                myFarmId.value = payload.payload.farm_id;
+                isFirmOwner.value = false;
+                firmRoute.value = 'chat';
+                saveUserProfile();
+              }
+              if (payload.payload?.farm_id === myFarmId.value) loadFarmMembers();
+            })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'farm_members' }, async (payload) => {
               console.log("【リアルタイム検知】メンバー行の削除（DELETE）をキャッチしました:", payload);
               
@@ -4478,6 +4523,14 @@
               content: '🙌 ' + m.name + 'さんがファームに加入しました！よろしく！'
             }]);
             
+            if (farmGlobalChannel) {
+              farmGlobalChannel.send({
+                type: 'broadcast',
+                event: 'farm_member_approved',
+                payload: { farm_id: myFarmId.value, user_id: m.id }
+              });
+            }
+            
             await loadFarmMembers();
           } catch(e) {
             console.error('承認エラー:', e);
@@ -4534,6 +4587,27 @@
         const joinFirm = async (f) => {
           if (!f || !f.id) return;
           try {
+            if (myPendingFarmId.value && myPendingFarmId.value !== f.id) {
+              const prevFarmId = myPendingFarmId.value;
+              const { error: cancelError } = await supa
+                .from('farm_members')
+                .delete()
+                .eq('user_id', currentUser.value)
+                .eq('farm_id', prevFarmId)
+                .eq('status', 'pending');
+                
+              if (!cancelError) {
+                alert('以前のファームへの加入申請を取り消しました。新しいファームへ申請します。');
+                if (farmGlobalChannel) {
+                  farmGlobalChannel.send({
+                    type: 'broadcast',
+                    event: 'farm_member_applied',
+                    payload: { farm_id: prevFarmId }
+                  });
+                }
+              }
+            }
+
             // upsertだとRLSのUPDATEポリシーに引っかかるため、insertを使用します。
             const { error: memberError } = await supa
               .from('farm_members')
@@ -4548,6 +4622,13 @@
             myPendingFarmId.value = f.id;
             alert('加入申請を送信しました。管理者の承認をお待ちください。');
             
+            if (farmGlobalChannel) {
+              farmGlobalChannel.send({
+                type: 'broadcast',
+                event: 'farm_member_applied',
+                payload: { farm_id: f.id }
+              });
+            }
           } catch (e) {
             console.error(e);
             alert('加入処理中にエラーが発生しました。');
