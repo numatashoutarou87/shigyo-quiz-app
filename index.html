@@ -625,7 +625,16 @@
     <!-- FIRM MEMBER PROFILE MODAL -->
     <div v-if="showMemberProfileModal" class="badge-modal-overlay">
       <div class="badge-modal" style="align-items:center;">
-        <div class="profile-avatar" style="margin-bottom:10px;">👤</div>
+        <div class="profile-avatar" style="margin-bottom:10px; position:relative;">
+          👤
+          <div style="position:absolute; right:-20px; top:0;">
+             <button @click="showProfileMenu = !showProfileMenu" style="background:none; border:none; font-size:20px; color:var(--primary-navy); cursor:pointer;">⋮</button>
+             <div v-if="showProfileMenu" style="position:absolute; right:0; top:25px; background:white; border:1px solid #ccc; border-radius:5px; padding:5px; box-shadow:0 2px 5px rgba(0,0,0,0.2); width:120px; z-index:100; font-size:12px; display:flex; flex-direction:column; gap:5px;">
+                <button @click="openBlockConfirm(activeFirmMember)" style="background:none; border:none; color:#e74c3c; cursor:pointer; padding:5px; text-align:left;">ブロックする</button>
+                <button @click="openReportModal(activeFirmMember)" style="background:none; border:none; color:#555; cursor:pointer; padding:5px; text-align:left;">通報する</button>
+             </div>
+          </div>
+        </div>
         <div class="profile-badge-tag" style="position:static; transform:none; margin-bottom:15px; font-size:13px;">{{ activeFirmMember?.badge }}</div>
         <div style="font-size:22px; font-weight:bold; color:var(--primary-navy); margin-bottom:5px;">{{ activeFirmMember?.name }}</div>
         <div style="font-size:14px; color:var(--accent-gold); font-weight:bold; margin-bottom:20px;">Lv.{{ activeFirmMember?.level }} ・ {{ activeFirmMember?.title }}</div>
@@ -637,11 +646,27 @@
         <button class="primary-btn" @click="sendFriendRequest(activeFirmMember)" :disabled="isAlreadyFriend(activeFirmMember?.id) || requestedFriends.includes(activeFirmMember?.id)" :style="isAlreadyFriend(activeFirmMember?.id) || requestedFriends.includes(activeFirmMember?.id) ? 'background:#ccc; color:#fff;' : 'background:var(--accent-gold); color:var(--primary-navy);'">
           {{ isAlreadyFriend(activeFirmMember?.id) ? 'フレンド登録済み' : (requestedFriends.includes(activeFirmMember?.id) ? '申請中' : 'フレンド申請する') }}
         </button>
-        <button class="badge-modal-close" @click="showMemberProfileModal = false; activeFirmMember = null" style="background:var(--primary-navy); color:white; margin-top:15px;">閉じる</button>
+        <button class="badge-modal-close" @click="showMemberProfileModal = false; activeFirmMember = null; showProfileMenu = false" style="background:var(--primary-navy); color:white; margin-top:15px;">閉じる</button>
       </div>
     </div>
 
     <transition name="fade" mode="out-in">
+      
+    <!-- REPORT MODAL -->
+    <div v-if="showReportModal" class="badge-modal-overlay">
+      <div class="badge-modal" style="align-items:center;">
+        <h3 style="margin-bottom: 15px; color:var(--primary-navy);">通報する</h3>
+        <select v-model="reportReason" style="width:100%; padding:10px; margin-bottom:10px; border-radius:5px; border:1px solid #ccc; box-sizing: border-box;">
+          <option value="spam">スパム・宣伝</option>
+          <option value="inappropriate">不適切な表現・画像</option>
+          <option value="harassment">嫌がらせ・誹謗中傷</option>
+          <option value="other">その他</option>
+        </select>
+        <textarea v-model="reportDetails" placeholder="詳細な理由（任意）" rows="4" style="width:100%; padding:10px; margin-bottom:15px; border-radius:5px; border:1px solid #ccc; box-sizing: border-box;"></textarea>
+        <button class="primary-btn" @click="submitReport" style="background:var(--accent-gold); color:var(--primary-navy); margin-bottom: 10px;">送信する</button>
+        <button class="badge-modal-close" @click="showReportModal = false" style="background:var(--primary-navy); color:white;">キャンセル</button>
+      </div>
+    </div>
       
       <!-- ====================== -->
       <!-- AUTH: LOGIN -->
@@ -990,7 +1015,8 @@
               <div class="friend-list-header">
                 <h2>フレンド ({{ friendsList.length }}人)</h2>
                 <div style="display: flex; gap: 10px; margin-top: 10px; justify-content: flex-end;">
-                  <button class="primary-btn" @click="friendRoute = 'search'" style="width: auto; padding: 0 15px; margin: 0;">ユーザー検索 🔍</button>
+                  <button class="secondary-btn" @click="friendRoute = 'blocked'; loadBlockedUsersList(); activeMenuFriendId = null" style="width: auto; padding: 0 15px; margin: 0; background: #555; color: white;">ブロック一覧</button>
+                  <button class="primary-btn" @click="friendRoute = 'search'; activeMenuFriendId = null" style="width: auto; padding: 0 15px; margin: 0;">ユーザー検索 🔍</button>
                 </div>
               </div>
               <!-- 届いた申請エリア -->
@@ -1026,6 +1052,13 @@
                   <div style="display: flex; gap: 15px; align-items: center; position: absolute; right: 15px; top: 50%; transform: translateY(-50%);">
                     <div style="color: var(--accent-gold); font-size: 20px;">💬</div>
                     <button @click.stop="removeFriend(f)" style="background: none; border: none; color: #C62828; font-size: 16px; cursor: pointer; padding: 4px; display:flex; align-items:center; justify-content:center;">✖</button>
+                    <div style="position: relative;">
+                      <button @click.stop="activeMenuFriendId = activeMenuFriendId === f.id ? null : f.id" style="background: none; border: none; font-size: 20px; color: #888; cursor: pointer; padding: 0 4px;">⋮</button>
+                      <div v-if="activeMenuFriendId === f.id" style="position:absolute; right:0; top:25px; background:white; border:1px solid #ccc; border-radius:5px; padding:5px; box-shadow:0 2px 5px rgba(0,0,0,0.2); width:120px; z-index:100; font-size:12px; display:flex; flex-direction:column; gap:5px;">
+                        <button @click.stop="openBlockConfirm(f)" style="background:none; border:none; color:#e74c3c; cursor:pointer; padding:5px; text-align:left;">ブロックする</button>
+                        <button @click.stop="openReportModal(f)" style="background:none; border:none; color:#555; cursor:pointer; padding:5px; text-align:left;">通報する</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1033,7 +1066,7 @@
             
             <div v-else-if="friendRoute === 'search'" class="friend-list-view">
               <div class="friend-list-header">
-                <button class="back-btn" @click="friendRoute = 'list'" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
+                <button class="back-btn" @click="friendRoute = 'list'; activeMenuFriendId = null" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
                 <h2 style="color: var(--bg-white);">ユーザーを探す</h2>
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
                   <input type="text" v-model="userSearchQuery" placeholder="ユーザー名で検索..." class="friend-search" style="flex: 1; margin: 0;" @keyup.enter="searchUsers" @focus="handleInputFocus" @blur="handleInputBlur">
@@ -1079,12 +1112,41 @@
               </div>
             </div>
             
+            <div v-else-if="friendRoute === 'blocked'" class="friend-list-view">
+              <div class="friend-list-header">
+                <button class="back-btn" @click="friendRoute = 'list'; activeMenuFriendId = null" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
+                <h2 style="color: var(--bg-white);">ブロック一覧</h2>
+              </div>
+              <div v-if="blockedUsersList.length === 0" style="text-align: center; color: #888; margin-top: 40px;">
+                ブロックしているユーザーはいません
+              </div>
+              <div class="friend-list" v-else>
+                <div class="friend-item" v-for="f in blockedUsersList" :key="f.id" style="position:relative; padding-right: 100px;">
+                  <div class="friend-icon">👤</div>
+                  <div class="friend-info">
+                    <div class="friend-name"><span style="color:var(--accent-gold); font-size:12px; margin-right:4px;">[{{ f.badge || '' }}]</span>{{ f.name }}</div>
+                    <div class="friend-level">Lv.{{ f.level }} ・ {{ f.title || 'アソシエイト（見習い）' }}</div>
+                  </div>
+                  <div style="display: flex; gap: 15px; align-items: center; position: absolute; right: 15px; top: 50%; transform: translateY(-50%);">
+                    <button @click.stop="unblockUser(f)" style="background: var(--primary-navy); border: 1px solid #ccc; color: white; font-size: 12px; cursor: pointer; padding: 6px 12px; border-radius: 6px;">解除</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             <div v-else-if="friendRoute === 'chat'" class="friend-chat-screen">
               <div class="friend-chat-header">
-                <button class="back-btn" @click="friendRoute = 'list'" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
+                <button class="back-btn" @click="friendRoute = 'list'; showChatMenu = false" style="position: static; margin-right: 15px; font-size: 14px;">← 戻る</button>
                 <div class="friend-icon" style="font-size: 24px; margin-right: 10px; margin-bottom: 0;">{{ activeFriend?.icon }}</div>
                 <div>
                   <div class="friend-name" style="margin-bottom:0;">{{ activeFriend?.name }}</div>
+                </div>
+                <div style="margin-left: auto; position: relative;">
+                  <button @click="showChatMenu = !showChatMenu" style="background:none; border:none; font-size:20px; color:var(--primary-navy); cursor:pointer;">⋮</button>
+                  <div v-if="showChatMenu" style="position:absolute; right:0; top:25px; background:white; border:1px solid #ccc; border-radius:5px; padding:5px; box-shadow:0 2px 5px rgba(0,0,0,0.2); width:120px; z-index:100; font-size:12px; display:flex; flex-direction:column; gap:5px;">
+                    <button @click="openBlockConfirm(activeFriend)" style="background:none; border:none; color:#e74c3c; cursor:pointer; padding:5px; text-align:left;">ブロックする</button>
+                    <button @click="openReportModal(activeFriend)" style="background:none; border:none; color:#555; cursor:pointer; padding:5px; text-align:left;">通報する</button>
+                  </div>
                 </div>
               </div>
               <div class="firm-chat-timeline" id="directChatArea" style="flex:1;">
@@ -1292,6 +1354,9 @@
                   </div>
                   
                   <button class="primary-btn" style="background: var(--text-sub); color: white;" @click="doLogout">ログアウト</button>
+                  <div style="text-align: right; margin-top: 30px;">
+                    <button @click="showDeleteAccountModal = true; deleteAccountAgreed = false;" style="background: none; border: none; color: #a0aec0; font-size: 12px; cursor: pointer; text-decoration: underline;">退会する</button>
+                  </div>
 
 
                 </div>
@@ -1329,6 +1394,31 @@
         </div>
       </div>
     </transition>
+
+      <!-- ====================== -->
+      <!-- ACCOUNT DELETE MODAL -->
+      <!-- ====================== -->
+      <transition name="fade">
+        <div class="terms-modal-overlay" v-if="showDeleteAccountModal" @click.self="showDeleteAccountModal = false">
+          <div class="terms-modal-content" style="max-height: 80vh; max-width: 90%; background: white; border-radius: 12px; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column;">
+            <div class="terms-modal-header" style="color: #e53e3e; font-size: 18px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; flex-shrink: 0;">退会の確認</div>
+            <div class="terms-modal-body" style="font-size: 14px; color: #333; margin-bottom: 20px; line-height: 1.5; flex: 1; overflow-y: auto;">
+              本当に退会しますか？<br><br>
+              アカウントを削除すると、これまでの学習記録やプレミアムプランの権利を含むすべてのデータが完全に消去され、復元できなくなります。
+            </div>
+            <div style="margin-bottom: 20px; flex-shrink: 0;">
+              <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #555; cursor: pointer;">
+                <input type="checkbox" v-model="deleteAccountAgreed" style="margin-top: 3px;">
+                <span>注意事項を理解し、退会に同意します</span>
+              </label>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0;">
+              <button @click="showDeleteAccountModal = false" style="padding: 10px 15px; border-radius: 6px; border: 1px solid #ccc; background: white; color: #555; cursor: pointer; font-weight: bold;">キャンセル</button>
+              <button @click="deleteAccount" :disabled="!deleteAccountAgreed" :style="{ background: deleteAccountAgreed ? '#e53e3e' : '#fc8181', color: 'white', border: 'none', borderRadius: '6px', padding: '10px 15px', fontWeight: 'bold', cursor: deleteAccountAgreed ? 'pointer' : 'not-allowed' }">完全に退会する</button>
+            </div>
+          </div>
+        </div>
+      </transition>
 
       <!-- ====================== -->
       <!-- TERMS & PRIVACY MODALS -->
@@ -1449,6 +1539,151 @@
         // --- Multi-User Auth & State Management ---
         const authScreen = ref('login');
         const currentUser = ref(null);
+        const blockedUsers = ref([]);
+        const blockedUsersList = ref([]);
+        const activeMenuFriendId = ref(null);
+        const showReportModal = ref(false);
+        const reportReason = ref('spam');
+        const reportDetails = ref('');
+        const reportTargetUserId = ref(null);
+        
+        const showDeleteAccountModal = ref(false);
+        const deleteAccountAgreed = ref(false);
+        const showProfileMenu = ref(false);
+        const showChatMenu = ref(false);
+
+        const loadBlockedUsers = async () => {
+          if (!currentUser.value) return;
+          try {
+            const { data, error } = await supa
+              .from('user_blocks')
+              .select('blocked_id')
+              .eq('blocker_id', currentUser.value);
+            if (!error && data) {
+              blockedUsers.value = data.map(b => b.blocked_id);
+            }
+          } catch(e) {
+            console.error('ブロックリスト取得エラー:', e);
+          }
+        };
+
+        const loadBlockedUsersList = async () => {
+          if (!currentUser.value || blockedUsers.value.length === 0) {
+            blockedUsersList.value = [];
+            return;
+          }
+          try {
+            const { data, error } = await supa
+              .from('user_profiles')
+              .select('id, user_name, level, active_badge')
+              .in('id', blockedUsers.value);
+            if (!error && data) {
+              blockedUsersList.value = data.map(u => {
+                let badge = "🔰";
+                if (u.active_badge) {
+                  const bInfo = ALL_BADGES.find(b => b.id === u.active_badge);
+                  badge = bInfo ? bInfo.icon + " " + bInfo.name : u.active_badge;
+                }
+                const titleIdx = Math.floor((u.level - 1) / 5);
+                return {
+                  id: u.id,
+                  name: u.user_name || '不明なユーザー',
+                  level: u.level || 1,
+                  title: TITLES[Math.min(titleIdx, 19)] || '新人',
+                  badge: badge
+                };
+              });
+            }
+          } catch(e) {
+            console.error('ブロックユーザー詳細取得エラー:', e);
+          }
+        };
+
+        const unblockUser = async (user) => {
+          if (!confirm(`${user.name}のブロックを解除しますか？`)) return;
+          try {
+            const { error } = await supa
+              .from('user_blocks')
+              .delete()
+              .eq('blocker_id', currentUser.value)
+              .eq('blocked_id', user.id);
+            if (error) throw error;
+            alert('ブロックを解除しました。');
+            await loadBlockedUsers();
+            await loadBlockedUsersList();
+            if (typeof loadFriendsList === 'function') loadFriendsList();
+            if (typeof loadFarmMembers === 'function') loadFarmMembers();
+          } catch (e) {
+            console.error('ブロック解除エラー:', e);
+            alert('ブロックの解除に失敗しました。');
+          }
+        };
+
+        const blockUser = async (user) => {
+          if (!confirm(`${user.name || user.user_name}さんを本当にブロックしますか？\n今後お互いのメッセージやプロフィールが表示されなくなります。`)) return;
+          try {
+            const targetId = user.id || user.user_id;
+            const { error } = await supa.from('user_blocks').insert([
+              { blocker_id: currentUser.value, blocked_id: targetId }
+            ]);
+            if (error && error.code !== '23505') throw error;
+            alert('ブロックしました。');
+            showChatMenu.value = false;
+            showProfileMenu.value = false;
+            showMemberProfileModal.value = false;
+            if (friendRoute.value === 'chat' && activeFriend.value?.id === targetId) {
+              friendRoute.value = 'list';
+            }
+            await loadBlockedUsers();
+            if (typeof loadFriendsList === 'function') loadFriendsList();
+            if (typeof loadFarmMembers === 'function') loadFarmMembers();
+          } catch (e) {
+            console.error('ブロックエラー:', e);
+            alert('ブロック処理に失敗しました。');
+          }
+        };
+
+        const submitReport = async () => {
+          if (!reportTargetUserId.value) return;
+          try {
+            const { error } = await supa.from('reports').insert([
+              { 
+                reporter_id: currentUser.value, 
+                reported_user_id: reportTargetUserId.value, 
+                reason: reportReason.value, 
+                details: reportDetails.value 
+              }
+            ]);
+            if (error) throw error;
+            alert('運営に通報を送信しました。ご協力ありがとうございます。');
+            showReportModal.value = false;
+            reportTargetUserId.value = null;
+            reportDetails.value = '';
+            showChatMenu.value = false;
+            showProfileMenu.value = false;
+          } catch (e) {
+            console.error('通報エラー:', e);
+            alert('送信に失敗しました。');
+          }
+        };
+        
+        const openReportModal = (user) => {
+          reportTargetUserId.value = user.id || user.user_id;
+          reportReason.value = 'spam';
+          reportDetails.value = '';
+          showReportModal.value = true;
+          showChatMenu.value = false;
+          showProfileMenu.value = false;
+          activeMenuFriendId.value = null;
+        };
+        const openBlockConfirm = (user) => {
+          showChatMenu.value = false;
+          showProfileMenu.value = false;
+          activeMenuFriendId.value = null;
+          setTimeout(() => {
+            blockUser(user);
+          }, 50);
+        };
         let app_users = {};
         try {
           app_users = JSON.parse(localStorage.getItem('app_users')) || {};
@@ -1510,6 +1745,7 @@
               loadGlobalData();
               await syncUserProfile(currentUser.value);
               saveUserProfile(true);
+              await loadBlockedUsers();
               await loadPendingRequests();
               await loadFriendsList();
               setupRealtimeFriendships();
@@ -2738,6 +2974,7 @@
           loadGlobalData();
           await syncUserProfile(currentUser.value);
           saveUserProfile(true);
+          await loadBlockedUsers();
           await loadPendingRequests();
           await loadFriendsList();
           setupRealtimeFriendships();
@@ -2781,6 +3018,41 @@
             // ダミー除霊: 古いテストユーザーが残らないようクリア
             localStorage.removeItem('app_users');
             app_users = {};
+          }
+        };
+
+        const deleteAccount = async () => {
+          if (!currentUser.value) return;
+          try {
+            // もしファームに所属していれば、脱退処理（リーダー委譲・ファーム消滅など）を先に実行する
+            if (isFarmMember.value && myFarmId.value) {
+              await leaveFirm(true);
+            }
+            
+            // Delete child records first to avoid foreign key constraint errors
+            await supa.from('user_progress').delete().eq('user_id', currentUser.value);
+            await supa.from('exam_records').delete().eq('user_id', currentUser.value);
+            await supa.from('study_logs').delete().eq('user_id', currentUser.value);
+            await supa.from('farm_members').delete().eq('user_id', currentUser.value);
+            await supa.from('user_blocks').delete().eq('blocker_id', currentUser.value);
+            await supa.from('user_blocks').delete().eq('blocked_id', currentUser.value);
+            await supa.from('reports').delete().eq('reporter_id', currentUser.value);
+            await supa.from('reports').delete().eq('reported_user_id', currentUser.value);
+            await supa.from('friend_requests').delete().eq('sender_id', currentUser.value);
+            await supa.from('friend_requests').delete().eq('receiver_id', currentUser.value);
+            await supa.from('friendships').delete().eq('user_id1', currentUser.value);
+            await supa.from('friendships').delete().eq('user_id2', currentUser.value);
+            await supa.from('direct_messages').delete().eq('sender_id', currentUser.value);
+            await supa.from('direct_messages').delete().eq('receiver_id', currentUser.value);
+            await supa.from('messages').delete().eq('user_id', currentUser.value);
+            
+            const { error } = await supa.from('user_profiles').delete().eq('id', currentUser.value);
+            if (error) throw error;
+            showDeleteAccountModal.value = false;
+            await doLogout();
+          } catch(e) {
+            console.error('Account deletion error:', e);
+            alert('退会処理に失敗しました。詳細: ' + (e.message || JSON.stringify(e)));
           }
         };
 
@@ -3394,7 +3666,8 @@
             if (error) {
               console.error("ユーザー検索エラー詳細:", error);
             } else if (data) {
-              const userIds = data.map(u => u.id);
+              const filteredData = blockedUsers.value ? data.filter(u => !blockedUsers.value.includes(u.id)) : data;
+              const userIds = filteredData.map(u => u.id);
               if (userIds.length > 0) {
                 const { data: rels } = await supa
                   .from('friendships')
@@ -3410,10 +3683,10 @@
                   });
                 }
               }
-              const orConditions = data.map(u => `and(user_id.eq.${u.id},profession_code.eq.${u.current_mode || 'shindanshi'})`).join(',');
+              const orConditions = filteredData.map(u => `and(user_id.eq.${u.id},profession_code.eq.${u.current_mode || 'shindanshi'})`).join(',');
               const { data: progressData } = await supa.from('user_progress').select('*').or(orConditions);
               
-              searchedUsers.value = data.map(u => {
+              searchedUsers.value = filteredData.map(u => {
                 const prog = progressData ? progressData.find(p => p.user_id === u.id && p.profession_code === (u.current_mode || 'shindanshi')) : null;
                 const displayLevel = prog ? prog.level : 1;
                 const displayBadge = prog ? prog.active_badge : '';
@@ -3466,13 +3739,17 @@
             }
             
             if (data && data.length > 0) {
-              const rawProfiles = data.map(item => {
+              let rawProfiles = data.map(item => {
                 let s = item.sender;
                 let r = item.receiver;
                 if (Array.isArray(s)) s = s[0];
                 if (Array.isArray(r)) r = r[0];
                 return (item.sender_id === myId) ? r : s;
               }).filter(Boolean);
+              
+              if (blockedUsers.value && blockedUsers.value.length > 0) {
+                rawProfiles = rawProfiles.filter(p => !blockedUsers.value.includes(p.id));
+              }
               
               if (rawProfiles.length > 0) {
                 const orConditions = rawProfiles.map(p => `and(user_id.eq.${p.id},profession_code.eq.${p.current_mode || 'shindanshi'})`).join(',');
@@ -3602,7 +3879,7 @@
               loadFriendsList();
               syncRequestedFriends();
               
-              if (payload.eventType === 'INSERT' && payload.new.status === 'pending') {
+              if (payload.eventType === 'INSERT' && payload.new.status === 'pending' && (!blockedUsers.value || !blockedUsers.value.includes(payload.new.sender_id))) {
                 const msg = document.createElement('div');
                 msg.innerText = 'ピコン！新しいフレンド申請が届きました！';
                 msg.style = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:var(--accent-gold); color:var(--primary-navy); padding:10px 20px; border-radius:20px; z-index:9999; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);';
@@ -3624,6 +3901,7 @@
                // 相手から新しいメッセージが届いた
                const msg = payload.new;
                const fid = msg.sender_id;
+               if (blockedUsers.value && blockedUsers.value.includes(fid)) return;
                if (!directChats.value[fid]) directChats.value[fid] = [];
                
                const timeStr = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -3920,7 +4198,9 @@
               console.error('History fetch error:', error);
             }
             if (history) {
-              targetArrayRef.value = history.reverse().map(formatMessage);
+              targetArrayRef.value = history.reverse()
+                .filter(msg => blockedUsers.value ? !blockedUsers.value.includes(msg.user_id) : true)
+                .map(formatMessage);
               setTimeout(() => {
                 const els = document.querySelectorAll('.firm-chat-timeline, .timeline-logs');
                 els.forEach(el => el.scrollTop = el.scrollHeight);
@@ -3930,7 +4210,7 @@
               .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, payload => {
                 if (payload.new && payload.new.room_id !== roomId) return;
                 if (payload.eventType === 'INSERT') {
-                  if (payload.new.user_id !== currentUser.value) {
+                  if (payload.new.user_id !== currentUser.value && (blockedUsers.value ? !blockedUsers.value.includes(payload.new.user_id) : true)) {
                     targetArrayRef.value.push(formatMessage(payload.new));
                     if (targetArrayRef.value.length > 50) targetArrayRef.value.shift();
                     setTimeout(() => {
@@ -4367,7 +4647,7 @@
             }
         };
 
-        const leaveFirm = async () => {
+        const leaveFirm = async (force = false) => {
           let targetFarmId = myFarmId.value;
 
           // Vueのステート構造変更等によりローカルのmyFarmIdが欠落している場合のフェールセーフ
@@ -4400,8 +4680,10 @@
             }
           }
 
-          const confirmLeave = confirm("本当にこのファームを脱退しますか？");
-          if (!confirmLeave) return;
+          if (force !== true) {
+            const confirmLeave = confirm("本当にこのファームを脱退しますか？");
+            if (!confirmLeave) return;
+          }
 
           try {
             // 自動リーダー委譲ロジック（リーダーが脱退する場合）
@@ -4457,7 +4739,8 @@
               .eq('user_id', currentUser.value);
 
             if (deleteError) {
-              alert("脱退処理に失敗しました: " + deleteError.message);
+              if (force !== true) alert("脱退処理に失敗しました: " + deleteError.message);
+              console.error(deleteError);
               return;
             }
 
@@ -4479,7 +4762,7 @@
             }
 
             // 6. 自分自身の画面を「未所属状態」に切り替える（リロードなしで即時反映）
-            alert("ファームを脱退しました。");
+            if (force !== true) alert("ファームを脱退しました。");
             
             // 所属状態・ファーム情報の完全クリア
             isFarmMember.value = false;
@@ -4890,6 +5173,9 @@
         ]);
 
         watch([activeTab, firmRoute, myFarmId], () => {
+          showProfileMenu.value = false;
+          showChatMenu.value = false;
+          activeMenuFriendId.value = null;
           if (activeTab.value === 'friend') {
             loadPendingRequests();
             loadFriendsList();
@@ -4912,12 +5198,14 @@
         });
 
         return {
+          showReportModal, reportReason, reportDetails, submitReport, openReportModal, openBlockConfirm, showProfileMenu, showChatMenu, blockedUsers, blockedUsersList, loadBlockedUsersList, unblockUser, activeMenuFriendId,
           showTutorial, tutorialCompleted, tutorialSlideIndex, tutorialSlides, completeTutorial, nextTutorialSlide, handleTouchStart, handleTouchEnd,
           handleInputFocus, handleInputBlur, isKeyboardVisible,
           ShigyoIAP,
           authScreen, currentUser, loginUsername, loginPassword, loginError, doLogin, doRegister, switchAuthMode, activeMode, selectMode,
           regUsername, regPassword, regIntro, regError, doLogout,
           agreedToTerms, showTermsModal, showPrivacyModal,
+          showDeleteAccountModal, deleteAccountAgreed, deleteAccount,
 
           isPremium, isFarmMember, isFirmOwner, myFarmId, displayName, totalExp, currentTitle, currentLevel, nextLevelExp, currentLevelStartExp, expProgressPercent, remainingExpToNext,
           chatCount, canSendChat, dailyCorrect, dailyCombo, unlockedBadges, activeBadge, activeBadgeDisplay, validBadgeCount, checkChatLimit,
